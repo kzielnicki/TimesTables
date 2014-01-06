@@ -1,5 +1,7 @@
 # Rename this file to config.py and put your NYT API keys here:
+# articleKey for Article Search API
+# commentKey for Community API
 [API_KEY]
-articleKey = '0000your:key:here' # Article Search API
-commentKey = '0000your:key:here' # Community API
+articleKey = 0000your:key:here
+commentKey = 0000your:key:here
 
