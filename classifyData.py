@@ -1,11 +1,12 @@
 from __future__ import division
-from apiQuery import TimesComments
 import pickle
 import matplotlib.pyplot as plt
 import numpy
 import itertools
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
+
+from apiQuery import TimesComments
 
 class LabeledData:
     """
@@ -27,7 +28,7 @@ class LabeledData:
     
     # some things we'll just guess aren't poems, others we'll ask the user about
     def checkIfPoem(self):
-        # if we have a predicion model available, use it to choose possible poems
+        # if we have a prediction model available, use it to choose possible poems
         if self.predProb != None:
             if self.predProb > 0.001:
                 self.askIfPoem()
@@ -68,41 +69,62 @@ class LearningModel:
     Create a logistic regression model to classify comments as poems or not poems
     """
     
-    @staticmethod
-    def sigmoid(Z):
-        return 1/(1+numpy.exp(-Z))
-
-    def __init__(self, trainingSet):
+    def __init__(self, trainingSet=None):
         """
+        initialize from saved learning model, or
         initialize from training set of labeledData, creating feature vector X and classification y
         """
         
-        self.trainingSet = trainingSet
-        self.n = len(trainingSet[0].parameters) # number of features
-        self.m = len(trainingSet)
-        self.X = numpy.zeros((self.m,self.n))
-        self.y = numpy.zeros((self.m))
-        
-        i = 0
-        for comment in trainingSet:
-            self.X[i] = comment.parameters
-            self.y[i] = comment.isPoem
-            i += 1
+        if trainingSet == None:
+            print 'Loading pre-trained model from file...'
+            try:
+                with open('model','r') as myFile:
+                    model = pickle.load(myFile)
+                    self.trainingSet = model.trainingSet
+                    self.m = model.m
+                    self.n = model.n
+                    self.X = model.X
+                    self.y = model.y
+                    self.mean = model.mean
+                    self.stdev = model.stdev
+                    self.logit = model.logit
+                    print 'Loaded model trained on %d comments!' % self.m
+            except Exception as e:
+                print 'Exception: '+str(e)
+                print 'Couldn\'t restore from file! Try training with:'
+                print 'LearningModel(trainingSet)'
+        else:
+            self.trainingSet = trainingSet
+            self.n = len(trainingSet[0].parameters) # number of features
+            self.m = len(trainingSet)
+            self.X = numpy.zeros((self.m,self.n))
+            self.y = numpy.zeros((self.m))
             
-        self.X = self.featureMap(self.X)
+            print 'Training model on %d comments...' % self.m
+            
+            i = 0
+            for comment in trainingSet:
+                self.X[i] = comment.parameters
+                self.y[i] = comment.isPoem
+                i += 1
                 
-        # normalize the features in X
-        self.mean = numpy.mean(self.X,0)
-        self.stdev = numpy.std(self.X,0)
-        self.X = self.normalize(self.X) #(self.X-self.mean)/self.stdev
-        
-        #self.svdVisualize()
-        
-        # apply unit bias
-        #self.X = numpy.hstack((numpy.ones((self.m,1)), self.X))
-        
-        self.logit = LogisticRegression(C=1, penalty='l1')
-        self.logit.fit(self.X,self.y)
+            self.X = self.featureMap(self.X)
+                    
+            # normalize the features in X
+            self.mean = numpy.mean(self.X,0)
+            self.stdev = numpy.std(self.X,0)
+            self.X = self.normalize(self.X) #(self.X-self.mean)/self.stdev
+            
+            #self.svdVisualize()
+            
+            # apply unit bias
+            #self.X = numpy.hstack((numpy.ones((self.m,1)), self.X))
+            
+            self.logit = LogisticRegression(C=1, penalty='l1')
+            self.logit.fit(self.X,self.y)
+            
+            with open('model','w') as myFile:
+                pickle.dump(self,myFile)
     
     
     def featureMap(self,X):
@@ -135,6 +157,16 @@ class LearningModel:
         pred_y = self.logit.predict(self.X)
         pred_prob = self.logit.predict_proba(self.X)[:,1]
         #print pred_prob
+        
+        
+        idx = range(self.n)
+        order = numpy.zeros(len(self.logit.coef_))
+        for d in range(1,degree+1):
+            order[d-1] = list(itertools.combinations_with_replacement(idx,d))
+              
+        print order
+        
+        
         print 'Coefficient array:'
         print self.logit.coef_
         print 'F1 score = %f' % metrics.f1_score(self.y, pred_y)
@@ -194,24 +226,16 @@ class LearningModel:
         return self.logit.predict_proba(x)[:,1][0]
         
 
-# change this routine so it pulls up and asks about anything with > 0.1% chance, throws away everything else (ie, doesn't
-# include in the training set. Then go through lots of days.
 if __name__ == "__main__":
-    restore = True
-    newExamples = False
-    date = '20140105'
+    """
+    If run from command line, optionally update the training set,
+    and retrain the learning model, based on parameters below:
+    """
+    restore = True # true to restore comments from file, false to query API
+    trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
+    date = '20140105' # date to use comments from if training new examples (YYYYMMDD)
+    """ END PARAMETER DEFINITION """
     
-    if(restore):
-        with open('timesComments'+date, 'r') as myFile:
-            myComments = pickle.load(myFile)
-        #myComments.analyzeComments()
-    else:
-        myComments = TimesComments()
-        #myComments.initByKeyword('brainlike','computers learning')
-        myComments.initByDate(date)
-        with open('timesComments'+date,'w') as myFile:
-            pickle.dump(myComments,myFile)
-        #myComments.analyzeComments()
     
     # load training data and add new training data
     try:
@@ -220,14 +244,15 @@ if __name__ == "__main__":
     except:
         print 'Creating new training set'
         trainingSet = []
-    
-    if len(trainingSet) > 100:
-        myModel = LearningModel(trainingSet)
-    else:
-        myModel = None
         
-    if newExamples:
+    if trainNewExamples:
+        if len(trainingSet) > 100:
+            myModel = LearningModel(trainingSet)
+        else:
+            myModel = None
+            
         commentList = map(lambda x: x.comment, trainingSet)
+        myComments = TimesComments(date,restore)
         
         i = 0
         for comment in myComments.iterComments():
@@ -243,5 +268,4 @@ if __name__ == "__main__":
         with open('trainingset','w') as myFile:
             pickle.dump(trainingSet,myFile)
     
-    # X = myModel.X
-    # y = myModel.y
+    myModel = LearningModel(trainingSet)

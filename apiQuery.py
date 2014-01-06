@@ -14,7 +14,6 @@ import functools
 import numpy
 import ConfigParser
 
-
 class TimesComments:
     """
     Query the NYT API to obtain a list of comments, and perform basic analysis on the comments obtained
@@ -30,7 +29,7 @@ class TimesComments:
     commentsAPI = 'http://api.nytimes.com/svc/community/v2/comments/'
     articleAPI = 'http://api.nytimes.com/svc/search/v2/'
         
-    def __init__(self, date=None, restore=True, savePoems=False):
+    def __init__(self, date=None, restore=True):
         """
         initialize a new TimesComments object, grabbing all comments from date if specified (format YYYYMMDD)
         optionally, set whether to restore from saved file, and savePoems to text file
@@ -47,8 +46,11 @@ class TimesComments:
             if restore:
                 try:
                     with open('timesComments'+date, 'r') as myFile:
-                        self = pickle.load(myFile)
-                except:
+                        saved = pickle.load(myFile)
+                        self.myComments = saved.myComments
+                        print 'Loaded %d comments!' % len(self.myComments)
+                except Exception as e:
+                    print 'Exception: '+str(e)
                     print 'Couldn\'t restore from file! Try loading from the API with:'
                     print 'TimesComments(\''+date+'\',False)'
                     
@@ -57,8 +59,6 @@ class TimesComments:
                 self.initByDate(date)
                 with open('timesComments'+date,'w') as myFile:
                     pickle.dump(self,myFile)
-
-            self.analyzeComments(savePoems,date)
         
 
     def queryArticles(self, queryDict):
@@ -173,11 +173,11 @@ class TimesComments:
             try:
                 self.myComments.append(commentQ.get(True,5))
             except Queue.Empty:
-                print 'Couldn\'t get all the comments?'
+                print 'Couldn\'t get all the comments? Try running again.'
                 break
             
         # make sure we got at least as many comments as we wanted (maybe a couple more people posted)
-        print 'got '+str(len(self.myComments))+' comments'
+        print 'got %d comments (expected %d)' % (len(self.myComments), totalFound)
         assert  len(self.myComments) >= totalFound 
 
 
@@ -260,7 +260,23 @@ class TimesComments:
         lastWords = map(lambda x: 4 if x >= 2 else x, lastWords)
         return sum(lastWords)/(len(lastWords)-1)
     
-    
+    @staticmethod
+    def features(comment):
+        """
+        Calculate the feature vector for a given comment
+        """
+        lineList = comment.split('\n')
+        lineList = numpy.array(map(lambda x: len(x), lineList))
+        
+        lines = len(lineList)
+        stdLength = numpy.std(lineList)
+        newlineRatio = lines/len(comment)
+        rhymeQ = TimesComments.__rhymeQuotient(comment)
+        numerics = len(filter(functools.partial(operator.contains, string.digits), comment))
+        
+        return (lines,stdLength,newlineRatio,rhymeQ,numerics)
+        
+        
     def iterComments(self):
         """ 
         return an iterable list of comments along with calculated parameters
@@ -273,16 +289,7 @@ class TimesComments:
             #print comment
             text = url + '\n\n' + comment.decode('utf-8').encode("ascii","ignore")
             
-            lineList = comment.split('\n')
-            lineList = numpy.array(map(lambda x: len(x), lineList))
-            
-            lines = len(lineList)
-            stdLength = numpy.std(lineList)
-            newlineRatio = lines/len(comment)
-            rhymeQ = self.__rhymeQuotient(comment)
-            numerics = len(filter(functools.partial(operator.contains, string.digits), comment))
-            
-            yield (text, (lines,stdLength,newlineRatio,rhymeQ,numerics))
+            yield (text, self.features(comment))
             
         
         
@@ -291,25 +298,24 @@ class TimesComments:
         Analyze comments for word frequency, also find and optionally save poems
         """
         wordBucket = {}
+        myModel = None#LearningModel()
         
         for commentProperties in self.myComments:
             comment = commentProperties['comment']
-            comment = re.sub('\n+', '\n', comment)
-            newlineRatio = comment.count('\n')/len(comment)
-            # if comment.find('humans to train') >= 0:
-                # comment = re.sub('<br/>', '\n', comment)
-                # print comment
-                # print newlineRatio
+            #comment = re.sub('\n+', '\n', comment)
+           
+            predProb = 0#myModel.predictNewPoem(self.features(comment))
                 
-            if newlineRatio > 0.02:
+            # display everything with 20%+ chance of being a poem
+            if predProb > 0.2:
                 print comment
-                print '\nrhymeQuotient=%f, newlineRatio=%f' % (TimesComments.__rhymeQuotient(comment), newlineRatio)
+                print '\nPossible poem w/ probability=%f' % predProb
                 print '%s?comments#permid=%s' % (commentProperties['url'],commentProperties['id'])
                 print '\n\n\n--------\n\n\n'
                 if saveToFile:
                     with open('poems'+tag,'a') as f:
                         f.write(comment+'\n')
-                        f.write('\nrhymeQuotient=%f, newlineRatio=%f\n' % (TimesComments.__rhymeQuotient(comment), newlineRatio))
+                        f.write('\nPossible poem w/ probability=%f\n' % predProb)
                         f.write('%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id']))
                         f.write('\n\n\n--------\n\n\n\n')
                     
@@ -333,6 +339,9 @@ class TimesComments:
         
 
 
-if __name__ == "__main__": 
-    myComments = TimesComments('20140104')
+if __name__ == "__main__":
+    print 'Usage:'
+    print '  TimesComments(\'YYYYMMDD\') - restore comments from date'
+    print '  TimesComments(\'YYYYMMDD\',False) - query API for comments from date, then save to file'
+    #myComments = TimesComments('20140104')
 
