@@ -4,6 +4,7 @@
 config.cfg
 poems*
 timesComments*
+wordcount*
 trainingset
 model
 

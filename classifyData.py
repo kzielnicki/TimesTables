@@ -12,6 +12,8 @@ class LabeledData:
     """
     Holds a comment and parameters describing the comment
     Tries to classify as a poem/not poem, asks user if unsure
+    
+    NOTE: requires user input on init!
     """
     
     def __init__(self, c, p, model=None, isPoem=None):
@@ -26,9 +28,12 @@ class LabeledData:
         if isPoem==None:
             self.checkIfPoem()
     
-    # some things we'll just guess aren't poems, others we'll ask the user about
+
     def checkIfPoem(self):
-        # if we have a prediction model available, use it to choose possible poems
+        """
+        If we have a prediction model available, use it to choose possible poems
+        otherwise, make a rough guess based on line count, newlines, and rhyming
+        """
         if self.predProb != None:
             if self.predProb > 0.001:
                 self.askIfPoem()
@@ -48,6 +53,9 @@ class LabeledData:
                 self.askIfPoem()
         
     def askIfPoem(self):
+        """
+        Ask the user if this comment is a poem, then label correctly
+        """
         print '\n-------\n'
         if self.predProb == None:
             print 'Possible poem w/ lines=%d, std=%f, nl_ratio=%f rhyming=%f num=%d\n\n' % self.parameters
@@ -128,7 +136,9 @@ class LearningModel:
     
     
     def featureMap(self,X):
-        # create higher order polynomial features up to 'degree'
+        """
+        Create higher order polynomial features up to 'degree'
+        """
         degree = 3
         
         multiply = lambda x,y: x*y # helper function for reduce
@@ -147,6 +157,9 @@ class LearningModel:
         return X
         
     def normalize(self,X):
+        """
+        return vector or point X normalized to zero mean and unit standard deviation
+        """
         return (X-self.mean)/self.stdev
     
     def reviewTrainingData(self, recheck=False):    
@@ -207,7 +220,7 @@ class LearningModel:
     
     def svdVisualize(self):
         """
-        use SVD for feature visualization in 2D
+        Use SVD for feature visualization in 2D
         """
         
         (U,S,V) = numpy.linalg.svd(numpy.dot(self.X.T,self.X)/self.m)
@@ -220,6 +233,9 @@ class LearningModel:
         plt.show()
         
     def predictNewPoem(self,x):
+        """
+        Return probability that comment with feature vector x is a poem
+        """
         x = numpy.array(x)
         x = self.featureMap(x)
         x = self.normalize(x)
@@ -237,7 +253,7 @@ if __name__ == "__main__":
     """ END PARAMETER DEFINITION """
     
     
-    # load training data and add new training data
+    # load training data
     try:
         with open('trainingset','r') as myFile:
             trainingSet = pickle.load(myFile)
@@ -245,6 +261,7 @@ if __name__ == "__main__":
         print 'Creating new training set'
         trainingSet = []
         
+    # if requested, add new examples from 'date' to the training set
     if trainNewExamples:
         if len(trainingSet) > 100:
             myModel = LearningModel(trainingSet)
@@ -262,7 +279,7 @@ if __name__ == "__main__":
             else:
                 print str(i) + '/' + str(len(myComments.myComments))
                 newpt = LabeledData(comment[0],comment[1],myModel)
-                if newpt.predProb != None and newpt.predProb > 0.001:
+                if newpt.predProb == None or newpt.predProb > 0.001:
                     trainingSet.append(newpt)
         
         with open('trainingset','w') as myFile:
