@@ -24,7 +24,8 @@ class TimesComments:
     initByDate      - get all comments from a given date
     initByKeywords  - get all comments containing a given keyword
     iterComments    - return an iterable list of comments and comment parameters
-    analyzeComments - do basic comment analysis, finding poems, calculating word frequency
+    features        - return tuple of features calculated from comment
+    analyzeComments - [DEPRECATED] do basic comment analysis, finding poems, calculating word frequency
     """
     commentsAPI = 'http://api.nytimes.com/svc/community/v2/comments/'
     articleAPI = 'http://api.nytimes.com/svc/search/v2/'
@@ -269,12 +270,13 @@ class TimesComments:
         lineList = numpy.array(map(lambda x: len(x), lineList))
         
         lines = len(lineList)
+        avgLength = numpy.mean(lineList)
         stdLength = numpy.std(lineList)
         newlineRatio = lines/len(comment)
         rhymeQ = TimesComments.__rhymeQuotient(comment)
-        numerics = len(filter(functools.partial(operator.contains, string.digits), comment))
+        numAndSpecial = len(filter(functools.partial(operator.contains, string.digits+'@#$%^*<>\'"'), comment))
         
-        return (lines,stdLength,newlineRatio,rhymeQ,numerics)
+        return (lines,avgLength,stdLength,newlineRatio,rhymeQ,numAndSpecial)
         
         
     def iterComments(self):
@@ -287,37 +289,34 @@ class TimesComments:
             url = '%s?comments#permid=%s' % (commentProperties['url'],commentProperties['id'])
             #print url
             #print comment
-            text = url + '\n\n' + comment.decode('utf-8').encode("ascii","ignore")
+            #text = url + '\n\n' + comment.decode('utf-8').encode("ascii","ignore")
             
-            yield (text, self.features(comment))
+            yield (comment, url, self.features(comment))
             
         
         
-    def analyzeComments(self,saveToFile=False,tag=''):
+    def analyzeComments(self):
         """
         Analyze comments for word frequency, also find and optionally save poems
+        
+        DEPRECATED! USE commentAnalysis.py INSTEAD!
         """
         wordBucket = {}
-        myModel = None#LearningModel()
         
         for commentProperties in self.myComments:
             comment = commentProperties['comment']
-            #comment = re.sub('\n+', '\n', comment)
-           
-            predProb = 0#myModel.predictNewPoem(self.features(comment))
+            comment = re.sub('\n+', '\n', comment)
+            newlineRatio = comment.count('\n')/len(comment)
+            # if comment.find('humans to train') >= 0:
+                # comment = re.sub('<br/>', '\n', comment)
+                # print comment
+                # print newlineRatio
                 
-            # display everything with 20%+ chance of being a poem
-            if predProb > 0.2:
+            if newlineRatio > 0.02:
                 print comment
-                print '\nPossible poem w/ probability=%f' % predProb
+                print '\nrhymeQuotient=%f, newlineRatio=%f' % (TimesComments.__rhymeQuotient(comment), newlineRatio)
                 print '%s?comments#permid=%s' % (commentProperties['url'],commentProperties['id'])
                 print '\n\n\n--------\n\n\n'
-                if saveToFile:
-                    with open('poems'+tag,'a') as f:
-                        f.write(comment+'\n')
-                        f.write('\nPossible poem w/ probability=%f\n' % predProb)
-                        f.write('%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id']))
-                        f.write('\n\n\n--------\n\n\n\n')
                     
         
             words = comment.split()
@@ -328,14 +327,10 @@ class TimesComments:
                     wordBucket[new_word] += 1
                 else:
                     wordBucket[new_word] = 1
+                    
         sortedWords = sorted(wordBucket.iteritems(), key=operator.itemgetter(1), reverse = True)
         print sortedWords[:100]
         return sortedWords
-
-        # with open('wordlist', 'w') as myFile:
-            # pickle.dump(sortedWords, myFile)
-        # with open('allComments', 'w') as myFile:
-            # pickle.dump(self.myComments, myFile)
         
 
 

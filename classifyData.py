@@ -3,6 +3,7 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy
 import itertools
+import pprint
 from sklearn.linear_model import LogisticRegression
 from sklearn import metrics
 
@@ -13,21 +14,24 @@ class LabeledData:
     Holds a comment and parameters describing the comment
     Tries to classify as a poem/not poem, asks user if unsure
     
-    NOTE: requires user input on init!
+    NOTE: requires potential user input on init!
     """
     
-    def __init__(self, c, p, model=None, isPoem=None):
+    def __init__(self, url, c, p, model=None, isPoem=None):
+        self.manuallyClassified = False
+        self.url = url
         self.comment = c
         self.parameters = p
         self.isPoem = isPoem
         self.predProb = None
         if model != None:
             self.predProb = model.predictNewPoem(p)
-            #print '\n\n-------\n\nMiscategorized poem (p = %f):' % pred_prob
             
         if isPoem==None:
             self.checkIfPoem()
     
+    def __str__(self):
+        return '%s\n------\n%s' % (self.parameters,self.comment)
 
     def checkIfPoem(self):
         """
@@ -35,12 +39,12 @@ class LabeledData:
         otherwise, make a rough guess based on line count, newlines, and rhyming
         """
         if self.predProb != None:
-            if self.predProb > 0.001:
+            if self.predProb > 0.01:
                 self.askIfPoem()
             else:
                 self.isPoem = False
         else:
-            (lines,stdLength,newlineRatio,rhymeQuotient,numerics) = self.parameters
+            (lines,avgLength,stdLength,newlineRatio,rhymeQuotient,specialChar) = self.parameters
             if lines < 2:
                 self.isPoem = False
             elif (newlineRatio+rhymeQuotient/100) < 0.02:
@@ -56,6 +60,8 @@ class LabeledData:
         """
         Ask the user if this comment is a poem, then label correctly
         """
+        self.manuallyClassified = True
+        
         print '\n-------\n'
         if self.predProb == None:
             print 'Possible poem w/ lines=%d, std=%f, nl_ratio=%f rhyming=%f num=%d\n\n' % self.parameters
@@ -76,6 +82,8 @@ class LearningModel:
     """
     Create a logistic regression model to classify comments as poems or not poems
     """
+    
+    degree = 3 # polynomial degree for feature maping
     
     def __init__(self, trainingSet=None):
         """
@@ -139,11 +147,11 @@ class LearningModel:
         """
         Create higher order polynomial features up to 'degree'
         """
-        degree = 3
+        
         
         multiply = lambda x,y: x*y # helper function for reduce
         idx = range(self.n)
-        for d in range(2,degree+1):
+        for d in range(2,self.degree+1):
             order = list(itertools.combinations_with_replacement(idx,d))
             for combination in order:
                 newFeature = reduce(multiply,X[:,combination].T)
@@ -166,22 +174,27 @@ class LearningModel:
         """
         Calculate precision and recall on the training set, also display miscategorized poems,
         and optionally ask the user to re-confirm the categorization
+        
+        TODO: split into training data and test set for model evaluation
         """
         pred_y = self.logit.predict(self.X)
         pred_prob = self.logit.predict_proba(self.X)[:,1]
-        #print pred_prob
         
-        
+        # find and print the most significant coefficients from the logistic regression
         idx = range(self.n)
-        order = numpy.zeros(len(self.logit.coef_))
-        for d in range(1,degree+1):
-            order[d-1] = list(itertools.combinations_with_replacement(idx,d))
-              
-        print order
+        order = []
+        names = ('lines','ave','stdev','nlRatio','rhymeQ','sChar')
+        for d in range(1,self.degree+1):
+            for group in itertools.combinations_with_replacement(idx,d):
+                order.append([names[n] for n in group])
+
+        coeff = self.logit.coef_.ravel()                
+        sortedCoeff = sorted(zip(coeff,order), key = lambda tup: -abs(tup[0]))
         
+        print 'Most significant coefficients:'
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(sortedCoeff)
         
-        print 'Coefficient array:'
-        print self.logit.coef_
         print 'F1 score = %f' % metrics.f1_score(self.y, pred_y)
         
         precision, recall, thresholds = metrics.precision_recall_curve(self.y, pred_prob)
@@ -202,14 +215,14 @@ class LearningModel:
             i = idx[n]
             if pred_prob[i] < 0.2:
                 if self.y[i]:
-                    print '\n\n-------\n\nMiscategorized poem (p = %f):' % pred_prob[i]
+                    print '\n\n-------\n\n[False -] Miscategorized poem (p = %f):\n%s\n' % (pred_prob[i],self.trainingSet[i].url)
                     if recheck:
                         self.trainingSet[i].askIfPoem()
                     else:
                         print self.trainingSet[i].comment
             elif pred_prob[i] > 0.2:
                 if not self.y[i]:
-                    print '\n\n-------\n\nMiscategorized non-poem (p = %f):' % pred_prob[i]
+                    print '\n\n-------\n\n[False +] Miscategorized non-poem (p = %f):\n%s\n' % (pred_prob[i],self.trainingSet[i].url)
                     if recheck:
                         self.trainingSet[i].askIfPoem()
                     else:
@@ -249,7 +262,7 @@ if __name__ == "__main__":
     """
     restore = True # true to restore comments from file, false to query API
     trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140105' # date to use comments from if training new examples (YYYYMMDD)
+    date = '20140106' # date to use comments from if training new examples (YYYYMMDD)
     """ END PARAMETER DEFINITION """
     
     
@@ -278,8 +291,9 @@ if __name__ == "__main__":
                 print 'comment already found!'
             else:
                 print str(i) + '/' + str(len(myComments.myComments))
-                newpt = LabeledData(comment[0],comment[1],myModel)
-                if newpt.predProb == None or newpt.predProb > 0.001:
+                newpt = LabeledData(comment[0],comment[1],comment[2],myModel)
+                # if we have a trained learning model, only add manually classified points
+                if newpt.predProb == None or newpt.manuallyClassified:
                     trainingSet.append(newpt)
         
         with open('trainingset','w') as myFile:

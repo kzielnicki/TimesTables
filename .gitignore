@@ -8,6 +8,8 @@ wordcount*
 trainingset
 model
 
+util*
+*.bak
 
 
 #############

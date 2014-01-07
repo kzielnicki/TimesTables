@@ -76,7 +76,7 @@ class CommentAnalysis:
         total = reduce(lambda (a,b),(c,d): ('sum',b+d),sortedWords)[1]
         
         # if requested, save all words that appear at least 10 times, along with count and frequency
-        if  True or saveToFile:
+        if saveToFile:
             with open('wordcount'+self.date,'w') as f:
                 for (word,count) in sortedWords:
                     if count >= 10:
