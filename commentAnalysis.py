@@ -31,6 +31,9 @@ class CommentAnalysis:
         """
         Find and optionally save poems to file using learning model
         """
+        if saveToFile:
+            with open('poems'+self.date,'a') as f:
+                f.write('Comment poems from %s\n\n' % self.date)
 
         for commentProperties in self.myComments.myComments:
             comment = commentProperties['comment']
@@ -45,7 +48,7 @@ class CommentAnalysis:
                 print '\n%s?comments#permid=%s' % (commentProperties['url'],commentProperties['id'])
                 print '\n\n\n--------\n\n\n'
                 if saveToFile:
-                    with open('poems'+self.date,'w') as f:
+                    with open('poems'+self.date,'a') as f:
                         f.write(comment+'\n')
                         f.write('\nPossible poem w/ probability=%f\n' % predProb)
                         f.write('%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id']))

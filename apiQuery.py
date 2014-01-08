@@ -272,11 +272,12 @@ class TimesComments:
         lines = len(lineList)
         avgLength = numpy.mean(lineList)
         stdLength = numpy.std(lineList)
-        newlineRatio = lines/len(comment)
+        #newlineRatio = lines/len(comment) # basically equal to 1/avgLength
         rhymeQ = TimesComments.__rhymeQuotient(comment)
-        numAndSpecial = len(filter(functools.partial(operator.contains, string.digits+'@#$%^*<>\'"'), comment))
+        numeric = len(filter(functools.partial(operator.contains, string.digits), comment))
+        specChar = len(filter(functools.partial(operator.contains, '@#$%^*<>/~\\+'), comment))
         
-        return (lines,avgLength,stdLength,newlineRatio,rhymeQ,numAndSpecial)
+        return (lines,avgLength,stdLength,rhymeQ,numeric,specChar)
         
         
     def iterComments(self):
@@ -330,7 +331,7 @@ class TimesComments:
                     
         sortedWords = sorted(wordBucket.iteritems(), key=operator.itemgetter(1), reverse = True)
         print sortedWords[:100]
-        return sortedWords
+        #return sortedWords
         
 
 

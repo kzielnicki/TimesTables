@@ -44,7 +44,8 @@ class LabeledData:
             else:
                 self.isPoem = False
         else:
-            (lines,avgLength,stdLength,newlineRatio,rhymeQuotient,specialChar) = self.parameters
+            (lines,avgLength,stdLength,rhymeQuotient,numeric,specialChar) = self.parameters
+            newlineRatio = 1/avgLength
             if lines < 2:
                 self.isPoem = False
             elif (newlineRatio+rhymeQuotient/100) < 0.02:
@@ -64,7 +65,7 @@ class LabeledData:
         
         print '\n-------\n'
         if self.predProb == None:
-            print 'Possible poem w/ lines=%d, std=%f, nl_ratio=%f rhyming=%f num=%d\n\n' % self.parameters
+            print 'Possible poem w/ lines=%d, std=%f, rhyming=%f, num=%d, special=%f \n\n' % self.parameters
         else:
             print 'Possible poem w/ probability=%f\n\n' % self.predProb
             
@@ -156,6 +157,8 @@ class LearningModel:
         """
         Create higher order polynomial features up to 'degree'
         """
+        # also define inverse features
+        X = numpy.hstack((X,1/(X+0.00001)))
         
         
         multiply = lambda x,y: x*y # helper function for reduce
@@ -205,9 +208,9 @@ class LearningModel:
         pred_prob = self.logit.predict_proba(self.X)[:,1]
         
         # find and print the most significant coefficients from the logistic regression
-        idx = range(self.n)
+        idx = range(2*self.n) # factor of 2 to account for inverse features
         order = []
-        names = ('lines','ave','stdev','nlRatio','rhymeQ','sChar')
+        names = ('lines','aveLen','stdev','rhymeQ','#\'s','sChar','INV_lines','INV_aveLen','INV_stdev','INV_rhymeQ','INV_#\'s','INV_sChar')
         for d in range(1,self.degree+1):
             for group in itertools.combinations_with_replacement(idx,d):
                 order.append([names[n] for n in group])
