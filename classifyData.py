@@ -17,7 +17,7 @@ class LabeledData:
     NOTE: requires potential user input on init!
     """
     
-    def __init__(self, url, c, p, model=None, isPoem=None):
+    def __init__(self, c, url, p, model=None, isPoem=None):
         self.manuallyClassified = False
         self.url = url
         self.comment = c
@@ -95,15 +95,12 @@ class LearningModel:
             print 'Loading pre-trained model from file...'
             try:
                 with open('model','r') as myFile:
-                    model = pickle.load(myFile)
-                    self.trainingSet = model.trainingSet
-                    self.m = model.m
-                    self.n = model.n
-                    self.X = model.X
-                    self.y = model.y
-                    self.mean = model.mean
-                    self.stdev = model.stdev
-                    self.logit = model.logit
+                    modelDict = pickle.load(myFile)
+                    self.n = modelDict['n']
+                    self.m = modelDict['m']
+                    self.mean = modelDict['mean']
+                    self.stdev = modelDict['stdev']
+                    self.logit = modelDict['logit']
                     print 'Loaded model trained on %d comments!' % self.m
             except Exception as e:
                 print 'Exception: '+str(e)
@@ -131,17 +128,29 @@ class LearningModel:
             self.stdev = numpy.std(self.X,0)
             self.X = self.normalize(self.X) #(self.X-self.mean)/self.stdev
             
+            # randomize the order of X & y
+            shuffleIdx = numpy.arange(self.m)
+            numpy.random.shuffle(shuffleIdx)
+            X_rand = self.X[shuffleIdx]
+            y_rand = self.y[shuffleIdx]
+            
+            # then split into training, cross-validation, and test sets, with 60/20/20 split
+            div1 = numpy.floor(self.m*0.6)
+            div2 = numpy.floor(self.m*0.8)
+            self.X_train = X_rand[0:div1]
+            self.y_train = y_rand[0:div1]
+            self.X_cv = X_rand[div1:div2]
+            self.y_cv = y_rand[div1:div2]
+            self.X_test = X_rand[div2:]
+            self.y_test = y_rand[div2:]
+            
             #self.svdVisualize()
             
-            # apply unit bias
-            #self.X = numpy.hstack((numpy.ones((self.m,1)), self.X))
-            
             self.logit = LogisticRegression(C=1, penalty='l1')
-            self.logit.fit(self.X,self.y)
+            self.logit.fit(self.X_train,self.y_train)
             
             with open('model','w') as myFile:
-                pickle.dump(self,myFile)
-    
+                pickle.dump({'logit':self.logit,'mean':self.mean,'stdev':self.stdev,'n':self.n,'m':self.m},myFile)
     
     def featureMap(self,X):
         """
@@ -169,6 +178,21 @@ class LearningModel:
         return vector or point X normalized to zero mean and unit standard deviation
         """
         return (X-self.mean)/self.stdev
+        
+    def measureTestSet(self):
+        pred_y = self.logit.predict(self.X_test)
+        pred_prob = self.logit.predict_proba(self.X_test)[:,1]
+        
+        print 'F1 score = %f' % metrics.f1_score(self.y_test, pred_y)
+        
+        precision, recall, thresholds = metrics.precision_recall_curve(self.y_test, pred_prob)
+        # make thresholds start at 0
+        thresholds = numpy.append([0],thresholds)
+        
+        f1 = 2 * (precision * recall) / (precision + recall)
+        
+        plt.plot(thresholds, precision, 'b', thresholds, recall, 'r', thresholds, f1, 'g')
+        plt.show()
     
     def reviewTrainingData(self, recheck=False):    
         """
@@ -198,10 +222,6 @@ class LearningModel:
         print 'F1 score = %f' % metrics.f1_score(self.y, pred_y)
         
         precision, recall, thresholds = metrics.precision_recall_curve(self.y, pred_prob)
-        # print precision
-        # print recall
-        # print thresholds
-        
         # make thresholds start at 0
         thresholds = numpy.append([0],thresholds)
         
@@ -213,23 +233,24 @@ class LearningModel:
         idx = numpy.argsort(pred_prob)
         for n in range(len(idx)):
             i = idx[n]
-            if pred_prob[i] < 0.2:
+            self.trainingSet[i].predProb = pred_prob[i]
+            if pred_prob[i] < 0.1:
                 if self.y[i]:
-                    print '\n\n-------\n\n[False -] Miscategorized poem (p = %f):\n%s\n' % (pred_prob[i],self.trainingSet[i].url)
+                    print '\n\n-------\n\n[False -] Miscategorized poem (p = %f):\n%s\n%s\n' % (pred_prob[i],self.trainingSet[i].parameters,self.trainingSet[i].url)
                     if recheck:
                         self.trainingSet[i].askIfPoem()
                     else:
                         print self.trainingSet[i].comment
-            elif pred_prob[i] > 0.2:
+            elif pred_prob[i] > 0.1:
                 if not self.y[i]:
-                    print '\n\n-------\n\n[False +] Miscategorized non-poem (p = %f):\n%s\n' % (pred_prob[i],self.trainingSet[i].url)
+                    print '\n\n-------\n\n[False +] Miscategorized non-poem (p = %f):\n%s\n%s\n' % (pred_prob[i],self.trainingSet[i].parameters,self.trainingSet[i].url)
                     if recheck:
                         self.trainingSet[i].askIfPoem()
                     else:
                         print self.trainingSet[i].comment
         if recheck:     
             with open('trainingset','w') as myFile:
-                pickle.dump(trainingSet,myFile)
+                pickle.dump(self.trainingSet,myFile)
     
     def svdVisualize(self):
         """
@@ -255,14 +276,17 @@ class LearningModel:
         return self.logit.predict_proba(x)[:,1][0]
         
 
+     
 if __name__ == "__main__":
     """
     If run from command line, optionally update the training set,
     and retrain the learning model, based on parameters below:
+    
+    *** BEGIN PARAMETER DEFINITION
     """
     restore = True # true to restore comments from file, false to query API
     trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140106' # date to use comments from if training new examples (YYYYMMDD)
+    date = '20140107' # date to use comments from if training new examples (YYYYMMDD)
     """ END PARAMETER DEFINITION """
     
     

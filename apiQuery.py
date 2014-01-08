@@ -291,7 +291,7 @@ class TimesComments:
             #print comment
             #text = url + '\n\n' + comment.decode('utf-8').encode("ascii","ignore")
             
-            yield (comment, url, self.features(comment))
+            yield (comment.decode('utf-8').encode("ascii","ignore"), url, self.features(comment))
             
         
         
