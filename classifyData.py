@@ -65,7 +65,7 @@ class LabeledData:
         
         print '\n-------\n'
         if self.predProb == None:
-            print 'Possible poem w/ lines=%d, std=%f, rhyming=%f, num=%d, special=%f \n\n' % self.parameters
+            print 'Possible poem w/ lines=%d, avglines=%f, std=%f, rhyming=%f, num=%d, special=%f \n\n' % self.parameters
         else:
             print 'Possible poem w/ probability=%f\n\n' % self.predProb
             
@@ -84,7 +84,7 @@ class LearningModel:
     Create a logistic regression model to classify comments as poems or not poems
     """
     
-    degree = 3 # polynomial degree for feature maping
+    degree = 2 # polynomial degree for feature maping
     
     def __init__(self, trainingSet=None):
         """
@@ -162,7 +162,7 @@ class LearningModel:
         
         
         multiply = lambda x,y: x*y # helper function for reduce
-        idx = range(self.n)
+        idx = range(2*self.n)
         for d in range(2,self.degree+1):
             order = list(itertools.combinations_with_replacement(idx,d))
             for combination in order:
@@ -289,7 +289,7 @@ if __name__ == "__main__":
     """
     restore = True # true to restore comments from file, false to query API
     trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140107' # date to use comments from if training new examples (YYYYMMDD)
+    date = '20140108' # date to use comments from if training new examples (YYYYMMDD)
     """ END PARAMETER DEFINITION """
     
     

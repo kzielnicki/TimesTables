@@ -258,7 +258,7 @@ class TimesComments:
                 best = max(best, TimesComments.__sharedLetters(lastWords[i],lastWords[j]))
             lastWords[i] = best
             
-        lastWords = map(lambda x: 4 if x >= 2 else x, lastWords)
+        lastWords = map(lambda x: 5 if x >= 2 else x, lastWords)
         return sum(lastWords)/(len(lastWords)-1)
     
     @staticmethod
@@ -275,7 +275,7 @@ class TimesComments:
         #newlineRatio = lines/len(comment) # basically equal to 1/avgLength
         rhymeQ = TimesComments.__rhymeQuotient(comment)
         numeric = len(filter(functools.partial(operator.contains, string.digits), comment))
-        specChar = len(filter(functools.partial(operator.contains, '@#$%^*<>/~\\+'), comment))
+        specChar = len(filter(functools.partial(operator.contains, '@=&#$%^*<>/~\\+'), comment))
         
         return (lines,avgLength,stdLength,rhymeQ,numeric,specChar)
         
