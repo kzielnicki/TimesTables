@@ -102,6 +102,7 @@ class LearningModel:
                     self.mean = modelDict['mean']
                     self.stdev = modelDict['stdev']
                     self.logit = modelDict['logit']
+                    self.degree = modelDict['degree']
                     print 'Loaded model trained on %d comments!' % self.m
             except Exception as e:
                 print 'Exception: '+str(e)
@@ -122,36 +123,54 @@ class LearningModel:
                 self.y[i] = comment.isPoem
                 i += 1
                 
-            self.X = self.featureMap(self.X)
-                    
-            # normalize the features in X
-            self.mean = numpy.mean(self.X,0)
-            self.stdev = numpy.std(self.X,0)
-            self.X = self.normalize(self.X) #(self.X-self.mean)/self.stdev
             
             # randomize the order of X & y
-            shuffleIdx = numpy.arange(self.m)
-            numpy.random.shuffle(shuffleIdx)
-            X_rand = self.X[shuffleIdx]
-            y_rand = self.y[shuffleIdx]
+            self.shuffleIdx = numpy.arange(self.m)
+            numpy.random.shuffle(self.shuffleIdx)
+            self.y = self.y[self.shuffleIdx]
             
-            # then split into training, cross-validation, and test sets, with 60/20/20 split
-            div1 = numpy.floor(self.m*0.6)
-            div2 = numpy.floor(self.m*0.8)
-            self.X_train = X_rand[0:div1]
-            self.y_train = y_rand[0:div1]
-            self.X_cv = X_rand[div1:div2]
-            self.y_cv = y_rand[div1:div2]
-            self.X_test = X_rand[div2:]
-            self.y_test = y_rand[div2:]
+            self.mapAndNormalizeFeatures()
             
             #self.svdVisualize()
             
             self.logit = LogisticRegression(C=1, penalty='l1')
             self.logit.fit(self.X_train,self.y_train)
             
-            with open('model','w') as myFile:
-                pickle.dump({'logit':self.logit,'mean':self.mean,'stdev':self.stdev,'n':self.n,'m':self.m},myFile)
+            self.pickleModel()
+    
+    def pickleModel(self):
+        """
+        Save to a pickle file the param
+        """
+            
+        with open('model','w') as myFile:
+            pickle.dump({'logit':self.logit,'degree':self.degree,'mean':self.mean,'stdev':self.stdev,'n':self.n,'m':self.m},myFile)
+
+
+
+    def mapAndNormalizeFeatures(self):
+        """
+        Prepare the dataset by mapping the features, splitting into training/cv/test,
+        and normalizing mean & stdev
+        """
+        X_rand = self.X[self.shuffleIdx]
+        self.X_mapped = self.featureMap(X_rand)
+        
+        # define splits for training, cross-validation, and test sets, with 60/20/20 split
+        div1 = numpy.floor(self.m*0.6)
+        div2 = numpy.floor(self.m*0.8)
+                    
+        # normalize the features in the training set
+        self.mean = numpy.mean(self.X_mapped[0:div1],0)
+        self.stdev = numpy.std(self.X_mapped[0:div1],0)
+        self.X = self.normalize(self.X_mapped) #(self.X-self.mean)/self.stdev
+        
+        self.X_train = self.X_mapped[0:div1]
+        self.y_train = self.y[0:div1]
+        self.X_cv = self.X_mapped[div1:div2]
+        self.y_cv = self.y[div1:div2]
+        self.X_test = self.X_mapped[div2:]
+        self.y_test = self.y[div2:]
     
     def featureMap(self,X):
         """
@@ -178,10 +197,67 @@ class LearningModel:
         
     def normalize(self,X):
         """
-        return vector or point X normalized to zero mean and unit standard deviation
+        Return vector or point X normalized to zero mean and unit standard deviation
         """
         return (X-self.mean)/self.stdev
+    
+    def cvTest(self):
+        """
+        Use cross validation set to choose parameters for fit
+        """
+        print '\n\nTest on degree = 2\n\n'
         
+        self.degree = 2
+        reg_params = 0.01*3**numpy.arange(0,2)#9)
+        best_degree = 2
+        best_f1 = 0
+        best_logit = None
+        for reg_param in reg_params:
+            logit = LogisticRegression(C=reg_param, penalty='l1')
+            logit.fit(self.X_train,self.y_train)
+            
+            pred_y = logit.predict(self.X_cv)
+            f1 = metrics.f1_score(self.y_cv, pred_y)
+            if f1>best_f1:
+                best_c = reg_param
+                best_f1 = f1
+                best_logit = logit
+            
+            pred_y = logit.predict(self.X_test)
+            f1_test = metrics.f1_score(self.y_test, pred_y)
+            
+            print 'F1 score for c=%f:\t%f\t(testset = %f)' % (reg_param, f1,f1_test)
+            
+        print '\n\nTest on degree = 3\n\n'
+        
+        self.degree = 3
+        self.mapAndNormalizeFeatures()
+        
+        reg_params = 0.01*3**numpy.arange(0,2)#8)
+        for reg_param in reg_params:
+            logit = LogisticRegression(C=reg_param, penalty='l1')
+            logit.fit(self.X_train,self.y_train)
+            
+            pred_y = logit.predict(self.X_cv)
+            f1 = metrics.f1_score(self.y_cv, pred_y)
+            if f1>best_f1:
+                best_c = reg_param
+                best_f1 = f1
+                best_logit = logit
+                best_degree = 3
+            
+            pred_y = logit.predict(self.X_test)
+            f1_test = metrics.f1_score(self.y_test, pred_y)
+            
+            print 'F1 score for c=%f:\t%f\t(testset = %f)' % (reg_param, f1,f1_test)
+            
+        print 'Best F1 score from cross-validation is %f, found on degree=%d, C=%f' % (best_f1, best_degree, best_c)
+        self.degree = best_degree
+        self.logit = best_logit
+        self.mapAndNormalizeFeatures()
+        
+        self.pickleModel()
+    
     def measureTestSet(self):
         pred_y = self.logit.predict(self.X_test)
         pred_prob = self.logit.predict_proba(self.X_test)[:,1]
@@ -204,8 +280,8 @@ class LearningModel:
         
         TODO: split into training data and test set for model evaluation
         """
-        pred_y = self.logit.predict(self.X)
-        pred_prob = self.logit.predict_proba(self.X)[:,1]
+        pred_y = self.logit.predict(self.X_mapped)
+        pred_prob = self.logit.predict_proba(self.X_mapped)[:,1]
         
         # find and print the most significant coefficients from the logistic regression
         idx = range(2*self.n) # factor of 2 to account for inverse features
@@ -233,24 +309,25 @@ class LearningModel:
         plt.plot(thresholds, precision, 'b', thresholds, recall, 'r', thresholds, f1, 'g')
         plt.show()
         
+        shuffledTrain = [self.trainingSet[x] for x in self.shuffleIdx] # X and y have been shuffled, so the training set must be too
         idx = numpy.argsort(pred_prob)
         for n in range(len(idx)):
             i = idx[n]
-            self.trainingSet[i].predProb = pred_prob[i]
-            if pred_prob[i] < 0.1:
+            shuffledTrain[i].predProb = pred_prob[i]
+            if pred_prob[i] < 0.2:
                 if self.y[i]:
-                    print '\n\n-------\n\n[False -] Miscategorized poem (p = %f):\n%s\n%s\n' % (pred_prob[i],self.trainingSet[i].parameters,self.trainingSet[i].url)
+                    print '\n\n-------\n\n[False -] Miscategorized poem (p = %f):\n%s\n%s\n' % (pred_prob[i],shuffledTrain[i].parameters,shuffledTrain[i].url)
                     if recheck:
-                        self.trainingSet[i].askIfPoem()
+                        shuffledTrain[i].askIfPoem()
                     else:
-                        print self.trainingSet[i].comment
-            elif pred_prob[i] > 0.1:
+                        print shuffledTrain[i].comment
+            elif pred_prob[i] > 0.2:
                 if not self.y[i]:
-                    print '\n\n-------\n\n[False +] Miscategorized non-poem (p = %f):\n%s\n%s\n' % (pred_prob[i],self.trainingSet[i].parameters,self.trainingSet[i].url)
+                    print '\n\n-------\n\n[False +] Miscategorized non-poem (p = %f):\n%s\n%s\n' % (pred_prob[i],shuffledTrain[i].parameters,shuffledTrain[i].url)
                     if recheck:
-                        self.trainingSet[i].askIfPoem()
+                        shuffledTrain[i].askIfPoem()
                     else:
-                        print self.trainingSet[i].comment
+                        print shuffledTrain[i].comment
         if recheck:     
             with open('trainingset','w') as myFile:
                 pickle.dump(self.trainingSet,myFile)
@@ -260,7 +337,7 @@ class LearningModel:
         Use SVD for feature visualization in 2D
         """
         
-        (U,S,V) = numpy.linalg.svd(numpy.dot(self.X.T,self.X)/self.m)
+        (U,S,V) = numpy.linalg.svd(numpy.dot(self.X_mapped.T,self.X_mapped)/self.m)
         Z = numpy.zeros((self.m,2))
         Z[:,0] = numpy.dot(self.X,U[:,0])
         Z[:,1] = numpy.dot(self.X,U[:,1])
