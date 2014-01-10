@@ -153,8 +153,7 @@ class LearningModel:
         Prepare the dataset by mapping the features, splitting into training/cv/test,
         and normalizing mean & stdev
         """
-        X_rand = self.X[self.shuffleIdx]
-        self.X_mapped = self.featureMap(X_rand)
+        self.X_mapped = self.featureMap(self.X[self.shuffleIdx])
         
         # define splits for training, cross-validation, and test sets, with 60/20/20 split
         div1 = numpy.floor(self.m*0.6)
@@ -163,7 +162,7 @@ class LearningModel:
         # normalize the features in the training set
         self.mean = numpy.mean(self.X_mapped[0:div1],0)
         self.stdev = numpy.std(self.X_mapped[0:div1],0)
-        self.X = self.normalize(self.X_mapped) #(self.X-self.mean)/self.stdev
+        self.X_mapped = self.normalize(self.X_mapped) #(self.X-self.mean)/self.stdev
         
         self.X_train = self.X_mapped[0:div1]
         self.y_train = self.y[0:div1]
@@ -208,7 +207,7 @@ class LearningModel:
         print '\n\nTest on degree = 2\n\n'
         
         self.degree = 2
-        reg_params = 0.01*3**numpy.arange(0,2)#9)
+        reg_params = 0.01*3**numpy.arange(0,9)
         best_degree = 2
         best_f1 = 0
         best_logit = None
@@ -233,7 +232,7 @@ class LearningModel:
         self.degree = 3
         self.mapAndNormalizeFeatures()
         
-        reg_params = 0.01*3**numpy.arange(0,2)#8)
+        reg_params = 0.01*3**numpy.arange(0,8)
         for reg_param in reg_params:
             logit = LogisticRegression(C=reg_param, penalty='l1')
             logit.fit(self.X_train,self.y_train)
@@ -277,8 +276,6 @@ class LearningModel:
         """
         Calculate precision and recall on the training set, also display miscategorized poems,
         and optionally ask the user to re-confirm the categorization
-        
-        TODO: split into training data and test set for model evaluation
         """
         pred_y = self.logit.predict(self.X_mapped)
         pred_prob = self.logit.predict_proba(self.X_mapped)[:,1]
