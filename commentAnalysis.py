@@ -35,6 +35,7 @@ class CommentAnalysis:
             with open('poems'+self.date,'a') as f:
                 f.write('Comment poems from %s\n\n' % self.date)
 
+        poemsFound = 0
         for commentProperties in self.myComments.myComments:
             comment = commentProperties['comment']
             #comment = re.sub('\n+', '\n', comment)
@@ -43,6 +44,7 @@ class CommentAnalysis:
                 
             # display everything with 20%+ chance of being a poem
             if predProb > 0.2:
+                poemsFound += 1
                 print 'Possible poem w/ probability=%f\n\n' % predProb
                 print comment
                 print '\n%s?comments#permid=%s' % (commentProperties['url'],commentProperties['id'])
@@ -53,7 +55,9 @@ class CommentAnalysis:
                         f.write('\nPossible poem w/ probability=%f\n' % predProb)
                         f.write('%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id']))
                         f.write('\n\n\n--------\n\n\n\n')
-    
+                        
+        print 'Found %d poems!\n\n' % poemsFound
+        
     def wordFrequency(self,saveToFile=False):
         """
         Analyze comments for word frequency

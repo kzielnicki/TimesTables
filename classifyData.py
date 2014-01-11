@@ -294,13 +294,20 @@ class LearningModel:
         
         self.pickleModel()
     
-    def measureTestSet(self):
-        pred_y = self.logit.predict(self.X_test)
-        pred_prob = self.logit.predict_proba(self.X_test)[:,1]
+    def measureTestSet(self, includeCV = False):
+        if includeCV:
+            X = numpy.r_[self.X_cv,self.X_test]
+            y = numpy.append(self.y_cv,self.y_test)
+        else:
+            X = self.X_test
+            y = self.y_test
+            
+        pred_y = self.logit.predict(X)
+        pred_prob = self.logit.predict_proba(X)[:,1]
         
-        print 'F1 score = %f' % metrics.f1_score(self.y_test, pred_y)
+        print 'F1 score = %f' % metrics.f1_score(y, pred_y)
         
-        precision, recall, thresholds = metrics.precision_recall_curve(self.y_test, pred_prob)
+        precision, recall, thresholds = metrics.precision_recall_curve(y, pred_prob)
         # make thresholds start at 0
         thresholds = numpy.append([0],thresholds)
         
@@ -308,6 +315,28 @@ class LearningModel:
         
         plt.plot(thresholds, precision, 'b', thresholds, recall, 'r', thresholds, f1, 'g')
         plt.show()
+        
+        targetThresholds = [0.01, 0.02, 0.04, 0.1, 0.2, 0.5]
+        idxThreshold = numpy.zeros(len(targetThresholds),dtype=numpy.int32)
+        idx = 0
+        current = 0
+        for t in thresholds:
+            if t >= targetThresholds[current]:
+                idxThreshold[current] = idx
+                current += 1
+                if current == len(targetThresholds):
+                    break
+            idx += 1
+            
+        #print idxThreshold
+        #print precision
+        #print precision[numpy.array([1.,2.,3.])]
+                
+        falsePosRates = (1-precision[idxThreshold])*100
+        falseNegRates = (1-recall[idxThreshold])*100
+        
+        for (targetThreshold, falseNegRate, falsePosRate) in zip(targetThresholds, falseNegRates, falsePosRates):
+            print 'With threshold of %d%%, per 100 poems detected, expected to miss %d, and incorrectly identify %d non-poems' % (100*targetThreshold, falseNegRate, falsePosRate)
     
     def reviewTrainingData(self, recheck=False):    
         """
@@ -403,7 +432,7 @@ if __name__ == "__main__":
     """
     restore = True # true to restore comments from file, false to query API
     trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140109' # date to use comments from if training new examples (YYYYMMDD)
+    date = '20140110' # date to use comments from if training new examples (YYYYMMDD)
     """ END PARAMETER DEFINITION """
     
     
