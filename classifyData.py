@@ -84,8 +84,6 @@ class LearningModel:
     Create a logistic regression model to classify comments as poems or not poems
     """
     
-    degree = 2 # polynomial degree for feature maping
-    
     def __init__(self, trainingSet=None):
         """
         initialize from saved learning model, or
@@ -103,12 +101,16 @@ class LearningModel:
                     self.stdev = modelDict['stdev']
                     self.logit = modelDict['logit']
                     self.degree = modelDict['degree']
+                    self.useInverse = modelDict['useInverse']
                     print 'Loaded model trained on %d comments!' % self.m
             except Exception as e:
                 print 'Exception: '+str(e)
                 print 'Couldn\'t restore from file! Try training with:'
                 print 'LearningModel(trainingSet)'
         else:
+            self.degree = 2 # polynomial degree for feature mapping
+            self.useInverse = True # whether to use inverse features for feature mapping
+            self.C = 1 # regularization parameter 
             self.trainingSet = trainingSet
             self.n = len(trainingSet[0].parameters) # number of features
             self.m = len(trainingSet)
@@ -133,18 +135,21 @@ class LearningModel:
             
             #self.svdVisualize()
             
-            self.logit = LogisticRegression(C=1, penalty='l1')
+            self.logit = LogisticRegression(C=self.C, penalty='l1')
             self.logit.fit(self.X_train,self.y_train)
             
             self.pickleModel()
     
     def pickleModel(self):
         """
-        Save to a pickle file the param
+        Save a model trained on all data to a pickled file, with relevant parameters for predicting comments
         """
+        print 'Saving model to file...'
+        logit = LogisticRegression(C=self.C, penalty='l1')
+        logit.fit(self.X_mapped,self.y)
             
         with open('model','w') as myFile:
-            pickle.dump({'logit':self.logit,'degree':self.degree,'mean':self.mean,'stdev':self.stdev,'n':self.n,'m':self.m},myFile)
+            pickle.dump({'logit':logit,'degree':self.degree,'useInverse':self.useInverse,'mean':self.mean,'stdev':self.stdev,'n':self.n,'m':self.m},myFile)
 
 
 
@@ -175,42 +180,48 @@ class LearningModel:
         """
         Create higher order polynomial features up to 'degree'
         """
-        # also define inverse features
-        X = numpy.hstack((X,1/(X+0.00001)))
+        penaltyCoeff = 1.2
+        penalties = penaltyCoeff*numpy.ones((self.n))
         
+        # also define inverse features
+        if self.useInverse:
+            X = numpy.hstack((X,1/(X+0.00001)))
+            penalties = numpy.append(penalties, penaltyCoeff*penalties);
         
         multiply = lambda x,y: x*y # helper function for reduce
-        idx = range(2*self.n)
+        idx = range(2*self.n if self.useInverse else self.n)
         for d in range(2,self.degree+1):
             order = list(itertools.combinations_with_replacement(idx,d))
             for combination in order:
                 newFeature = reduce(multiply,X[:,combination].T)
                 # different behavior if newFeature is scalar or vector -- slightly ugly =(
+                penalties = numpy.append(penalties, reduce(multiply,penalties[:,combination]))
                 if isinstance(newFeature,numpy.ndarray):
                     X = numpy.c_[X,newFeature]
                 else:
                     X = numpy.append(X,newFeature)
               
-        
+        self.penalties = penalties/penaltyCoeff
         return X
         
     def normalize(self,X):
         """
         Return vector or point X normalized to zero mean and unit standard deviation
         """
-        return (X-self.mean)/self.stdev
+        return (X-self.mean)/self.penalties/self.stdev
     
     def cvTest(self):
         """
         Use cross validation set to choose parameters for fit
         """
-        print '\n\nTest on degree = 2\n\n'
-        
-        self.degree = 2
-        reg_params = 0.01*3**numpy.arange(0,9)
-        best_degree = 2
+        best_degree = None
         best_f1 = 0
         best_logit = None
+        
+        print '\n\nTest on degree = 1\n\n'
+        self.degree = 1
+        self.mapAndNormalizeFeatures()
+        reg_params = 0.01*3**numpy.arange(0,13)
         for reg_param in reg_params:
             logit = LogisticRegression(C=reg_param, penalty='l1')
             logit.fit(self.X_train,self.y_train)
@@ -221,17 +232,42 @@ class LearningModel:
                 best_c = reg_param
                 best_f1 = f1
                 best_logit = logit
+                best_degree = 1
             
             pred_y = logit.predict(self.X_test)
             f1_test = metrics.f1_score(self.y_test, pred_y)
             
             print 'F1 score for c=%f:\t%f\t(testset = %f)' % (reg_param, f1,f1_test)
             
-        print '\n\nTest on degree = 3\n\n'
         
-        self.degree = 3
+        
+        
+        print '\n\nTest on degree = 2\n\n'
+        self.degree = 2
         self.mapAndNormalizeFeatures()
-        
+        reg_params = 0.01*3**numpy.arange(0,9)
+        for reg_param in reg_params:
+            logit = LogisticRegression(C=reg_param, penalty='l1')
+            logit.fit(self.X_train,self.y_train)
+            
+            pred_y = logit.predict(self.X_cv)
+            f1 = metrics.f1_score(self.y_cv, pred_y)
+            if f1>best_f1:
+                best_c = reg_param
+                best_f1 = f1
+                best_logit = logit
+                best_degree = 2
+            
+            pred_y = logit.predict(self.X_test)
+            f1_test = metrics.f1_score(self.y_test, pred_y)
+            
+            print 'F1 score for c=%f:\t%f\t(testset = %f)' % (reg_param, f1,f1_test)
+            
+            
+            
+        print '\n\nTest on degree = 3\n\n'    
+        self.degree = 3
+        self.mapAndNormalizeFeatures()  
         reg_params = 0.01*3**numpy.arange(0,8)
         for reg_param in reg_params:
             logit = LogisticRegression(C=reg_param, penalty='l1')
@@ -252,6 +288,7 @@ class LearningModel:
             
         print 'Best F1 score from cross-validation is %f, found on degree=%d, C=%f' % (best_f1, best_degree, best_c)
         self.degree = best_degree
+        self.C = best_c
         self.logit = best_logit
         self.mapAndNormalizeFeatures()
         
@@ -281,9 +318,12 @@ class LearningModel:
         pred_prob = self.logit.predict_proba(self.X_mapped)[:,1]
         
         # find and print the most significant coefficients from the logistic regression
-        idx = range(2*self.n) # factor of 2 to account for inverse features
+        idx = range(2*self.n if self.useInverse else self.n) # factor of 2 to account for inverse features
         order = []
-        names = ('lines','aveLen','stdev','rhymeQ','#\'s','sChar','INV_lines','INV_aveLen','INV_stdev','INV_rhymeQ','INV_#\'s','INV_sChar')
+        names = ('lines','aveLen','stdev','rhymeQ','#\'s','sChar')
+        if self.useInverse:
+            names = names + ('INV_lines','INV_aveLen','INV_stdev','INV_rhymeQ','INV_#\'s','INV_sChar')
+        
         for d in range(1,self.degree+1):
             for group in itertools.combinations_with_replacement(idx,d):
                 order.append([names[n] for n in group])
@@ -363,7 +403,7 @@ if __name__ == "__main__":
     """
     restore = True # true to restore comments from file, false to query API
     trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140108' # date to use comments from if training new examples (YYYYMMDD)
+    date = '20140109' # date to use comments from if training new examples (YYYYMMDD)
     """ END PARAMETER DEFINITION """
     
     
