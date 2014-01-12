@@ -180,7 +180,8 @@ class LearningModel:
         """
         Create higher order polynomial features up to 'degree'
         """
-        penaltyCoeff = 1.2
+        # optionally, penalize inverse and higher order features more than 1st order features
+        penaltyCoeff = 1.0
         penalties = penaltyCoeff*numpy.ones((self.n))
         
         # also define inverse features
@@ -313,7 +314,11 @@ class LearningModel:
         
         f1 = 2 * (precision * recall) / (precision + recall)
         
-        plt.plot(thresholds, precision, 'b', thresholds, recall, 'r', thresholds, f1, 'g')
+        plt.plot(thresholds, precision, 'b', label="Precision")
+        plt.plot(thresholds, recall, 'r', label="Recall")
+        plt.plot(thresholds, f1, 'g', label="F1")
+        plt.legend(loc='lower left')
+        plt.xlabel('Threshold')
         plt.show()
         
         targetThresholds = [0.01, 0.02, 0.04, 0.1, 0.2, 0.5]
@@ -405,8 +410,8 @@ class LearningModel:
         
         (U,S,V) = numpy.linalg.svd(numpy.dot(self.X_mapped.T,self.X_mapped)/self.m)
         Z = numpy.zeros((self.m,2))
-        Z[:,0] = numpy.dot(self.X,U[:,0])
-        Z[:,1] = numpy.dot(self.X,U[:,1])
+        Z[:,0] = numpy.dot(self.X_mapped,U[:,0])
+        Z[:,1] = numpy.dot(self.X_mapped,U[:,1])
         # plot projected data for visualization
         colors = map(lambda x: 'r' if x else 'b', self.y)
         plt.scatter(Z[:,0],Z[:,1],20,colors)
@@ -430,9 +435,9 @@ if __name__ == "__main__":
     
     *** BEGIN PARAMETER DEFINITION
     """
-    restore = True # true to restore comments from file, false to query API
+    restore = False # true to restore comments from file, false to query API
     trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140110' # date to use comments from if training new examples (YYYYMMDD)
+    date = '20140111' # date to use comments from if training new examples (YYYYMMDD)
     """ END PARAMETER DEFINITION """
     
     
