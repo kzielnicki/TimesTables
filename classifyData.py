@@ -428,18 +428,11 @@ class LearningModel:
         
 
      
-if __name__ == "__main__":
+def classifyData(date=None, restore=True):
     """
-    If run from command line, optionally update the training set,
-    and retrain the learning model, based on parameters below:
-    
-    *** BEGIN PARAMETER DEFINITION
+    Retrain the learning model and save to file, optionally also categorize new comments from 'date' with user input
+    Returns trained model
     """
-    restore = False # true to restore comments from file, false to query API
-    trainNewExamples = False # true to ask user to classify new examples, false to only use saved training set
-    date = '20140111' # date to use comments from if training new examples (YYYYMMDD)
-    """ END PARAMETER DEFINITION """
-    
     
     # load training data
     try:
@@ -450,7 +443,7 @@ if __name__ == "__main__":
         trainingSet = []
         
     # if requested, add new examples from 'date' to the training set
-    if trainNewExamples:
+    if date != None:
         if len(trainingSet) > 100:
             myModel = LearningModel(trainingSet)
         else:
@@ -475,3 +468,11 @@ if __name__ == "__main__":
             pickle.dump(trainingSet,myFile)
     
     myModel = LearningModel(trainingSet)
+    return myModel
+    
+    
+if __name__ == "__main__":
+    print 'Usage:'
+    print '  classifyData() - retrain the model on the training set'
+    print '  classifyData(\'YYYYMMDD\') - load and classify saved comments from date'
+    print '  classifyData(\'YYYYMMDD\',False) - query API for comments from date, then classify'
