@@ -110,13 +110,17 @@ class MultiAnalysis:
 
         wordDict = {}
         self.analyzers = []
+        self.words = []
+        self.dates = []
         for i in range(numDays):
             date = dateObj.strftime('%Y%m%d')
+            self.dates.append(date)
             dateObj += day
             print 'Loading ' + date
             analyzer = CommentAnalysis(date,verbose=False)
             self.analyzers.append(analyzer)
             words = analyzer.wordFrequency()
+            self.words.append(words)
             #print words['the']
             # combine counts from all days
             wordDict = dict( (n, wordDict.get(n, 0)+words.get(n, 0)) for n in set(wordDict)|set(words) )
@@ -124,7 +128,9 @@ class MultiAnalysis:
 
             
         # sort by number of occurrences
+        self.wordDict = wordDict
         self.sortedWords = sorted(wordDict.iteritems(), key=operator.itemgetter(1), reverse = True)
+        self.totalWords = reduce(lambda (a,b),(c,d): ('sum',b+d),self.sortedWords)[1]
 
     @staticmethod
     def __H(n,m):
@@ -133,7 +139,7 @@ class MultiAnalysis:
         return sum(series)
 
     @staticmethod
-    def getZipfConfint(f,N):
+    def getZipfConfint(f,N,sigmas=2):
         """
         95% confidence interval for frequency f drawn from zipf distribution with N samples
         """
@@ -145,25 +151,68 @@ class MultiAnalysis:
 
         # variance for half-normal distribution is sigma*sqrt(1-2/Pi)
         p = f_to_p(f)
-        stdErr = 2*numpy.sqrt(1-2/numpy.pi)/numpy.sqrt(N)
-        print 'p=%f, stderr=%f' % (p,stdErr)
+        stdErr = sigmas*numpy.sqrt(1-2/numpy.pi)/numpy.sqrt(N)
         
         low_p = p - stdErr
         high_p = p + stdErr
-        print 'low %f, high %f' % (low_p,high_p)
-
 
         low_f = p_to_f(high_p)
         high_f = p_to_f(low_p)
-        print 'low %f, high %f' % (low_f,high_f)
 
         return(low_f,high_f)
 
+    def gainsAndLosses(self, compareToYesterday=False, sigmas=2):
+        """
+        Find words that have gained or lost significantly in frequency
+        By default, compares with all days in analysis set, optionally only to yesterday
+        """
+        yesterday = None
+        for (date,words) in zip(self.dates,self.words):
+            if compareToYesterday and yesterday == None:
+                yesterday = words
+                continue 
+            
+
+            print '\n\n------%s------\n\n' % date
+
+            change = {}
+            total = reduce(lambda (a,b),(c,d): ('sum',b+d),words.iteritems())[1]
+            if compareToYesterday:
+                totalYesterday = reduce(lambda (a,b),(c,d): ('sum',b+d),yesterday.iteritems())[1]
+
+            for (word,count) in words.iteritems():
+                freq = count/total
+                (low_f, high_f) = MultiAnalysis.getZipfConfint(freq,count,sigmas)
+
+                if compareToYesterday:
+                    basecount = yesterday.get(word,0)
+                    basefreq = max(basecount,1) / totalYesterday # make sure basefreq isn't 0 to avoid infinities
+                else:
+                    N = self.totalWords - total # don't include today's words
+                    basecount = self.wordDict[word]-count
+                    basefreq = max(basecount,1) / N
+
+                (base_low,base_high) = MultiAnalysis.getZipfConfint(basefreq, max(basecount,1), sigmas)
+
+                change[word] = (freq / basefreq, low_f/base_high, high_f/base_low, count, basecount)
+            
+            self.change = change
+            gainers = sorted(change.iteritems(), key=lambda (k,v): v[1], reverse = True)
+            losers = sorted(change.iteritems(), key=lambda (k,v): v[2])
+
+            pp = pprint.PrettyPrinter(indent=4)
+            print 'Gainers: '
+            pp.pprint(gainers[:10])
+            print '\nLosers: '
+            pp.pprint(losers[:10])
+
+
+            yesterday = words
 
     def powerLawPlot(self):
         counts = [count for (word,count) in self.sortedWords if count > 10]
-        total = sum(counts)
-        wordFreq = numpy.array([count/total for count in counts])
+        #total = sum(counts)
+        wordFreq = numpy.array([count/self.totalWords for count in counts])
         n = len(wordFreq)
         rank = numpy.arange(1,n+1)
 
