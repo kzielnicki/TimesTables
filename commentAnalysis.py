@@ -104,7 +104,28 @@ class MultiAnalysis:
     Perform analysis on comments from multiple days
     """
     
-    def __init__(self,startDate,numDays):
+    def __init__(self,startDate=None,numDays=None,saveToFile=None,verbose=True,interactive=False):
+        # we can optionally ask the user about parameters
+        self.verbose = verbose
+
+        if interactive:
+            if startDate == None:
+                startDate = raw_input('Analyze comments starting from what date (YYYYMMDD)? ')
+            if numDays == None:
+                numDays = int(raw_input('How many days to analyze? '))
+            if saveToFile == None:
+                ans = ''
+                while ans != 'y' and ans != 'n':
+                    ans = raw_input('Save output to file (y/n)? ')
+                if ans == 'y':
+                    self.saveToFile = True
+                else:
+                    self.saveToFile = False
+        elif saveToFile == None:
+            self.saveToFile = False
+        else:
+            self.saveToFile = saveToFile
+
         dateObj = datetime.datetime.strptime(startDate,'%Y%m%d').date()
         day = datetime.timedelta(days=1)
 
@@ -131,6 +152,21 @@ class MultiAnalysis:
         self.wordDict = wordDict
         self.sortedWords = sorted(wordDict.iteritems(), key=operator.itemgetter(1), reverse = True)
         self.totalWords = reduce(lambda (a,b),(c,d): ('sum',b+d),self.sortedWords)[1]
+
+        # check whether to go ahead and do the analysis right now
+        if interactive:
+            ans = ''
+            while ans != 'y' and ans != 'n':
+                ans = raw_input('Plot word frequencies (y/n)? ')
+            if ans == 'y':
+                self.powerLawPlot()
+                
+            ans = ''
+            while ans != 'y' and ans != 'n':
+                ans = raw_input('Calculate gains and losses (y/n)? ')
+            if ans == 'y':
+                self.gainsAndLosses()
+
 
     @staticmethod
     def __H(n,m):
@@ -167,13 +203,13 @@ class MultiAnalysis:
         By default, compares with all days in analysis set, optionally only to yesterday
         """
         yesterday = None
+        result = {}
         for (date,words) in zip(self.dates,self.words):
             if compareToYesterday and yesterday == None:
                 yesterday = words
                 continue 
             
 
-            print '\n\n------%s------\n\n' % date
 
             change = {}
             total = reduce(lambda (a,b),(c,d): ('sum',b+d),words.iteritems())[1]
@@ -200,14 +236,27 @@ class MultiAnalysis:
             gainers = sorted(change.iteritems(), key=lambda (k,v): v[1], reverse = True)
             losers = sorted(change.iteritems(), key=lambda (k,v): v[2])
 
-            pp = pprint.PrettyPrinter(indent=4)
-            print 'Gainers: '
-            pp.pprint(gainers[:10])
-            print '\nLosers: '
-            pp.pprint(losers[:10])
+            
+            output = ''
+            output += 'Gainers:\n'
+            for (word, vals) in gainers[:10]:
+                output += '%s\t%f\t%f\t%f\t%i\t%i\n' % ((word,)+vals)
+            output += '\nLosers:\n'
+            for (word, vals) in losers[:10]:
+                output += '%s\t%f\t%f\t%f\t%i\t%i\n' % ((word,)+vals)
 
+            if self.verbose:
+                print '\n\n------%s------\n\n' % date
+                print output
+            if self.saveToFile:
+                with open('trending'+date,'w') as f:
+                    f.write(output)
+
+            result[date] = (gainers, losers)
 
             yesterday = words
+
+        return result
 
     def powerLawPlot(self):
         counts = [count for (word,count) in self.sortedWords if count > 10]
@@ -242,4 +291,5 @@ if __name__ == "__main__":
     print '  CommentAnalysis(\'YYYYMMDD\') - analyze saved comments from date'
     print '  CommentAnalysis(\'YYYYMMDD\',True) - analyze saved comments from date, saving poems to file'
     print '  CommentAnalysis(\'YYYYMMDD\',False,False) - query API for comments from date, then analyze'
+    print '  MultiAnalysis(interactive=True) - analyze word frequency trends from multiple days'
     #myAnalysis = AnalyzeComments('20140104')
