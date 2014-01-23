@@ -26,9 +26,14 @@ class CommentAnalysis:
         if verbose:
             print 'Beginning comment analysis...\n\n\n'
             self.findPoems(saveToFile)
-            self.wordList = self.wordFrequency(saveToFile)
-            pp = pprint.PrettyPrinter(indent=4)
-            pp.pprint(self.wordList[:100])
+            print 'Top words from today:\n\n'
+            self.wordFrequency(saveToFile)
+            print '\nComparing words with yesterday:\n\n'
+            day = datetime.timedelta(days=1)
+            today = datetime.datetime.strptime(date,'%Y%m%d').date()
+            yesterday = today - day
+            multi = MultiAnalysis(yesterday.strftime('%Y%m%d'),2,saveToFile,verbose)
+            multi.gainsAndLosses(True)
     
     def findPoems(self,saveToFile=False):
         """
@@ -90,6 +95,10 @@ class CommentAnalysis:
             # compute word frequencies
             sortedWords = [(word,count,count/total) for (word,count) in sortedWords]
         
+            if self.verbose:
+                pp = pprint.PrettyPrinter(indent=4)
+                pp.pprint(sortedWords[:100])
+
             # if requested, save all words that appear at least 10 times, along with count and frequency
             if saveToFile:
                 with open('wordcount'+self.date,'w') as f:
