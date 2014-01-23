@@ -175,17 +175,6 @@ class MultiAnalysis:
         return sum(series)
 
     @staticmethod
-    def getNormalInterval(f,N,z=2):
-        """
-        95% confidence interval for a frequency f assuming normal approximation of binomial confidence interval
-        """
-        delta = z*numpy.sqrt(f*(1-f)/N)
-
-        low = f-delta
-        high = f+delta
-        return (low,high)
-
-    @staticmethod
     def getWilsonInterval(f,N,z=2):
         """
         95% confidence interval for a frequency f assuming binomial confidence interval
@@ -199,34 +188,11 @@ class MultiAnalysis:
         high = K*(A+B)
         return (low,high)
 
-
-    @staticmethod
-    def getZipfConfint(f,N,sigmas=2):
-        """
-        95% confidence interval for frequency f drawn from zipf distribution with N samples
-        """
-        #zipf = ((numpy.arange(n)+1.0) ** -1) / MultiAnalysis.__H(n,1)
-
-        # transform frequencies to half-normal distribution with sigma=1
-        f_to_p = lambda f: numpy.sqrt( -2 * numpy.log(f) )
-        p_to_f = lambda p: numpy.exp( -(p**2) / 2 )
-
-        # variance for half-normal distribution is sigma*sqrt(1-2/Pi)
-        p = f_to_p(f)
-        stdErr = sigmas*numpy.sqrt(1-2/numpy.pi)/numpy.sqrt(N)
-        
-        low_p = p - stdErr
-        high_p = p + stdErr
-
-        low_f = p_to_f(high_p)
-        high_f = p_to_f(low_p)
-
-        return(low_f,high_f)
-
-    def gainsAndLosses(self, compareToYesterday=False, sigmas=2):
+    def gainsAndLosses(self, compareToYesterday=False, z=2):
         """
         Find words that have gained or lost significantly in frequency
         By default, compares with all days in analysis set, optionally only to yesterday
+        z=2 for ~95% confidence interval
         """
         yesterday = None
         result = {}
@@ -234,8 +200,6 @@ class MultiAnalysis:
             if compareToYesterday and yesterday == None:
                 yesterday = words
                 continue 
-            
-
 
             change = {}
             total = reduce(lambda (a,b),(c,d): ('sum',b+d),words.iteritems())[1]
@@ -244,17 +208,18 @@ class MultiAnalysis:
 
             for (word,count) in words.iteritems():
                 freq = count/total
-                (low_f, high_f) = MultiAnalysis.getZipfConfint(freq,count,sigmas)
+                (low_f, high_f) = MultiAnalysis.getWilsonInterval(freq,total,z)
 
                 if compareToYesterday:
+                    N = totalYesterday
                     basecount = yesterday.get(word,0)
-                    basefreq = max(basecount,1) / totalYesterday # make sure basefreq isn't 0 to avoid infinities
+                    basefreq = max(basecount,1) / N # make sure basefreq isn't 0 to avoid infinities
                 else:
                     N = self.totalWords - total # don't include today's words
                     basecount = self.wordDict[word]-count
                     basefreq = max(basecount,1) / N
 
-                (base_low,base_high) = MultiAnalysis.getZipfConfint(basefreq, max(basecount,1), sigmas)
+                (base_low,base_high) = MultiAnalysis.getWilsonInterval(basefreq, N, z)
 
                 change[word] = (freq / basefreq, low_f/base_high, high_f/base_low, count, basecount)
             
