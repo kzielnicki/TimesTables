@@ -175,6 +175,32 @@ class MultiAnalysis:
         return sum(series)
 
     @staticmethod
+    def getNormalInterval(f,N,z=2):
+        """
+        95% confidence interval for a frequency f assuming normal approximation of binomial confidence interval
+        """
+        delta = z*numpy.sqrt(f*(1-f)/N)
+
+        low = f-delta
+        high = f+delta
+        return (low,high)
+
+    @staticmethod
+    def getWilsonInterval(f,N,z=2):
+        """
+        95% confidence interval for a frequency f assuming binomial confidence interval
+        """
+        # wilson interval is K*(A +/- B) where:
+        K = 1/(1+z**2/N)
+        A = f + z**2/(2*N)
+        B = z*numpy.sqrt(f*(1-f)/N + z**2/(4*N**2))
+
+        low = K*(A-B)
+        high = K*(A+B)
+        return (low,high)
+
+
+    @staticmethod
     def getZipfConfint(f,N,sigmas=2):
         """
         95% confidence interval for frequency f drawn from zipf distribution with N samples
