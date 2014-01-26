@@ -29,10 +29,7 @@ class CommentAnalysis:
             print 'Top words from today:\n\n'
             self.wordFrequency(saveToFile)
             print '\nComparing words with yesterday:\n\n'
-            day = datetime.timedelta(days=1)
-            today = datetime.datetime.strptime(date,'%Y%m%d').date()
-            yesterday = today - day
-            multi = MultiAnalysis(yesterday.strftime('%Y%m%d'),2,saveToFile,verbose)
+            multi = MultiAnalysis(date,1,saveToFile,verbose)
             multi.gainsAndLosses(True)
     
     def findPoems(self,saveToFile=False):
@@ -45,7 +42,7 @@ class CommentAnalysis:
             with open('poems'+self.date,'a') as f:
                 f.write('Comment poems from %s\n\n' % self.date)
 
-        poemsFound = 0
+        foundPoems = [] 
         for commentProperties in self.myComments.myComments:
             comment = commentProperties['comment']
             #comment = re.sub('\n+', '\n', comment)
@@ -54,7 +51,7 @@ class CommentAnalysis:
                 
             # display everything with 20%+ chance of being a poem
             if predProb > 0.2:
-                poemsFound += 1
+                foundPoems.append((predProb, comment, '%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id'])))
                 if self.verbose:
                     print 'Possible poem w/ probability=%f\n\n' % predProb
                     print comment
@@ -67,7 +64,8 @@ class CommentAnalysis:
                         f.write('%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id']))
                         f.write('\n\n\n--------\n\n\n\n')
                         
-        print 'Found %d poems!\n\n' % poemsFound
+        print 'Found %d poems!\n\n' % len(foundPoems)
+        return foundPoems
         
     def wordFrequency(self,saveToFile=False):
         """
@@ -113,15 +111,15 @@ class MultiAnalysis:
     Perform analysis on comments from multiple days
     """
     
-    def __init__(self,startDate=None,numDays=None,saveToFile=None,verbose=True,interactive=False):
+    def __init__(self,date=None,lookbackDays=None,saveToFile=None,verbose=True,interactive=False):
         # we can optionally ask the user about parameters
         self.verbose = verbose
 
         if interactive:
-            if startDate == None:
-                startDate = raw_input('Analyze comments starting from what date (YYYYMMDD)? ')
-            if numDays == None:
-                numDays = int(raw_input('How many days to analyze? '))
+            if date == None:
+                date = raw_input('Analyze comments from what date (YYYYMMDD)? ')
+            if lookbackDays == None:
+                lookbackDays = int(raw_input('How many days to look back for comparison? '))
             if saveToFile == None:
                 ans = ''
                 while ans != 'y' and ans != 'n':
@@ -135,19 +133,19 @@ class MultiAnalysis:
         else:
             self.saveToFile = saveToFile
 
-        dateObj = datetime.datetime.strptime(startDate,'%Y%m%d').date()
+        dateObj = datetime.datetime.strptime(date,'%Y%m%d').date()
         day = datetime.timedelta(days=1)
 
         wordDict = {}
         self.analyzers = []
         self.words = []
         self.dates = []
-        for i in range(numDays):
-            date = dateObj.strftime('%Y%m%d')
-            self.dates.append(date)
-            dateObj += day
-            print 'Loading ' + date
-            analyzer = CommentAnalysis(date,verbose=False)
+        for i in range(lookbackDays+1):
+            date_str = dateObj.strftime('%Y%m%d')
+            self.dates.append(date_str)
+            dateObj -= day
+            print 'Loading ' + date_str
+            analyzer = CommentAnalysis(date_str,verbose=False)
             self.analyzers.append(analyzer)
             words = analyzer.wordFrequency()
             self.words.append(words)
@@ -197,7 +195,7 @@ class MultiAnalysis:
         high = K*(A+B)
         return (low,high)
 
-    def gainsAndLosses(self, compareToYesterday=False, z=2):
+    def gainsAndLosses(self, z=2):
         """
         Find words that have gained or lost significantly in frequency
         By default, compares with all days in analysis set, optionally only to yesterday
@@ -205,56 +203,45 @@ class MultiAnalysis:
         """
         yesterday = None
         result = {}
-        for (date,words) in zip(self.dates,self.words):
-            if compareToYesterday and yesterday == None:
-                yesterday = words
-                continue 
+        date = self.dates[0]
+        words = self.words[0]
 
-            change = {}
-            total = reduce(lambda (a,b),(c,d): ('sum',b+d),words.iteritems())[1]
-            if compareToYesterday:
-                totalYesterday = reduce(lambda (a,b),(c,d): ('sum',b+d),yesterday.iteritems())[1]
+        change = {}
+        total = reduce(lambda (a,b),(c,d): ('sum',b+d),words.iteritems())[1]
 
-            for (word,count) in words.iteritems():
-                freq = count/total
-                (low_f, high_f) = MultiAnalysis.getWilsonInterval(freq,total,z)
+        for (word,count) in words.iteritems():
+            freq = count/total
+            (low_f, high_f) = MultiAnalysis.getWilsonInterval(freq,total,z)
 
-                if compareToYesterday:
-                    N = totalYesterday
-                    basecount = yesterday.get(word,0)
-                    basefreq = max(basecount,1) / N # make sure basefreq isn't 0 to avoid infinities
-                else:
-                    N = self.totalWords - total # don't include today's words
-                    basecount = self.wordDict[word]-count
-                    basefreq = max(basecount,1) / N
+            N = self.totalWords - total # don't include today's words
+            basecount = self.wordDict[word]-count
+            basefreq = max(basecount,1) / N # make sure basefreq isn't 0 to avoid infinities
 
-                (base_low,base_high) = MultiAnalysis.getWilsonInterval(basefreq, N, z)
+            (base_low,base_high) = MultiAnalysis.getWilsonInterval(basefreq, N, z)
 
-                change[word] = (freq / basefreq, low_f/base_high, high_f/base_low, count, basecount)
+            change[word] = (freq / basefreq, low_f/base_high, high_f/base_low, count, basecount)
             
-            self.change = change
-            gainers = sorted(change.iteritems(), key=lambda (k,v): v[1], reverse = True)
-            losers = sorted(change.iteritems(), key=lambda (k,v): v[2])
+        self.change = change
+        gainers = sorted(change.iteritems(), key=lambda (k,v): v[1], reverse = True)
+        losers = sorted(change.iteritems(), key=lambda (k,v): v[2])
 
             
-            output = ''
-            output += 'Gainers:\n'
-            for (word, vals) in gainers[:10]:
-                output += '%s\t%f\t%f\t%f\t%i\t%i\n' % ((word,)+vals)
-            output += '\nLosers:\n'
-            for (word, vals) in losers[:10]:
-                output += '%s\t%f\t%f\t%f\t%i\t%i\n' % ((word,)+vals)
+        output = ''
+        output += 'Gainers:\n'
+        for (word, vals) in gainers[:10]:
+            output += '%s\t%f\t%f\t%f\t%i\t%i\n' % ((word,)+vals)
+        output += '\nLosers:\n'
+        for (word, vals) in losers[:10]:
+            output += '%s\t%f\t%f\t%f\t%i\t%i\n' % ((word,)+vals)
 
-            if self.verbose:
-                print '\n\n------%s------\n\n' % date
-                print output
-            if self.saveToFile:
-                with open('trending'+date,'w') as f:
-                    f.write(output)
+        if self.verbose:
+            print '\n\n------%s------\n\n' % date
+            print output
+        if self.saveToFile:
+            with open('trending'+date,'w') as f:
+                f.write(output)
 
-            result[date] = (gainers, losers)
-
-            yesterday = words
+        result = (gainers, losers)
 
         return result
 
