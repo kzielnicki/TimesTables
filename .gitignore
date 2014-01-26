@@ -2,15 +2,15 @@
 ## Project specific
 #############
 config.cfg
-poems*
 timesComments*
-wordcount*
-trending*
 trainingset
 model
 
 util*
 *.bak
+*.csv
+*.txt
+*.html
 
 
 #############

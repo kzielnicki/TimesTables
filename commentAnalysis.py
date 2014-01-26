@@ -39,7 +39,7 @@ class CommentAnalysis:
         self.myModel = LearningModel()
 
         if saveToFile:
-            with open('poems'+self.date,'a') as f:
+            with open('poems%s.txt' % self.date,'w') as f:
                 f.write('Comment poems from %s\n\n' % self.date)
 
         foundPoems = [] 
@@ -58,7 +58,7 @@ class CommentAnalysis:
                     print '\n%s?comments#permid=%s' % (commentProperties['url'],commentProperties['id'])
                     print '\n\n\n--------\n\n\n'
                 if saveToFile:
-                    with open('poems'+self.date,'a') as f:
+                    with open('poems%s.txt' % self.date,'a') as f:
                         f.write(comment+'\n')
                         f.write('\nPossible poem w/ probability=%f\n' % predProb)
                         f.write('%s?comments#permid=%s\n' % (commentProperties['url'],commentProperties['id']))
@@ -99,7 +99,7 @@ class CommentAnalysis:
 
             # if requested, save all words that appear at least 10 times, along with count and frequency
             if saveToFile:
-                with open('wordcount'+self.date,'w') as f:
+                with open('wordcount%s.txt' % self.date,'w') as f:
                     for (word,count,freq) in sortedWords:
                         if count >= 10:
                             f.write('%s, %d, %f\n' % (word,count,freq))
@@ -238,7 +238,7 @@ class MultiAnalysis:
             print '\n\n------%s------\n\n' % date
             print output
         if self.saveToFile:
-            with open('trending'+date,'w') as f:
+            with open('trending%s.txt' % date,'w') as f:
                 f.write(output)
 
         result = (gainers, losers)
@@ -268,6 +268,30 @@ class MultiAnalysis:
 
         #mu = MultiAnalysis.__H(n,2) / (H**2)
         #sigma = numpy.sqrt(MultiAnalysis.__H(n,3) / (H**3) - mu**2)
+
+    def saveRankData(self):
+        corpus = set()
+        for words in self.words:
+            sortedWords = sorted(words.iteritems(), key=operator.itemgetter(1), reverse = True)
+            top100 = sortedWords[:100]
+            for (word,count) in top100:
+                corpus.add(word)
+
+        corpus = sorted(corpus) # change set to ordered list
+        rankData = numpy.zeros((len(corpus),len(self.dates)))
+
+        for (d,words) in enumerate(reversed(self.words)):  # use reversed list to put days in time-order
+            total = sum(words.itervalues())
+            for (w,word) in enumerate(corpus):
+                rankData[w][d] = words.get(word,0)/total
+
+        print rankData
+        with open('rankData.csv','w') as outfile:
+            for (word,freqs) in zip(corpus,rankData):
+                outfile.write(word)
+                for f in freqs:
+                    outfile.write(',%f' % f)
+                outfile.write('\n')
 
 
 
