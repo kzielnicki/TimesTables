@@ -1,4 +1,5 @@
 from __future__ import division
+import sys
 import urllib, urllib2
 import json as simplejson
 import Queue
@@ -88,7 +89,7 @@ class TimesComments:
         return articleList
 
         
-    def __queryCommentsHelper(self, commentQ, errorQ, queryDict, offset):
+    def __queryCommentsHelper(self, commentQ, errorQ, queryDict, offset, attempt=1):
         """
         Do the actual work of querying the comment API, 25 comments at a time, at position 'offset'
         
@@ -97,6 +98,9 @@ class TimesComments:
         
         (using XML because JSON deletes line breaks for some reason!)
         """
+        if attempt > 5:
+            print 'TOO MANY FAILED ATTEMPTS FOR OFFSET %d, ABANDONING!' %offset
+            return 0
         
         print 'Querying API with offset = '+str(offset)
         queryDict['offset'] = offset
@@ -115,10 +119,10 @@ class TimesComments:
         except Exception as e:
             print 'Exception: '+str(e)
             print 'Couldn\'t get reply to query '+url
-            errorQ.put(offset)
+            errorQ.put((offset,attempt))
             #print search_results.read()
             #print simplejson.dumps(json, indent=4)
-            return
+            return 0
             
         #print simplejson.dumps(json, indent=4)
         assert json['status'] == 'OK'
@@ -128,14 +132,21 @@ class TimesComments:
             # print 'NOTE: only %d comments for offset %d!' % (len(results['comments']['comment']), offset)
         
         #print simplejson.dumps(results['comments']['comment'], indent=4)
-        for comment in results['comments']['comment']:
-            #print comment['commentBody'] + "\n\n------\n\n"
-            edited = comment['commentBody'].encode('utf-8')
-            edited = re.sub('<br/>', '\n', edited)
-            # edited = re.sub('<[^<]+?>', '', edited)
-            commentQ.put({'comment':edited,'id':comment['commentSequence'],'url':comment['articleURL']})
+        try:
+            for comment in results['comments']['comment']:
+                #print comment['commentBody'] + "\n\n------\n\n"
+                edited = comment['commentBody'].encode('utf-8')
+                edited = re.sub('<br/>', '\n', edited)
+                # edited = re.sub('<[^<]+?>', '', edited)
+                commentQ.put({'comment':edited,'id':comment['commentSequence'],'url':comment['articleURL']})
+            return int(results['totalCommentsFound'])
+        except Exception as e:
+            print 'Exception: '+str(e)
+            print 'Query %s returned unexpected results' % url
+            simplejson.dumps(results)
+            errorQ.put((offset,attempt))
+            return 0
             
-        return int(results['totalCommentsFound'])
     
     def queryComments(self, queryDict):
         """
@@ -164,9 +175,9 @@ class TimesComments:
             
         # retry everything in the errorQ
         while not errorQ.empty():
-            print 'Retrying after error'
-            offset = errorQ.get()
-            self.__queryCommentsHelper(commentQ, errorQ, queryDict, offset)
+            (offset,attempt) = errorQ.get()
+            print 'Retrying after error #%d' % attempt
+            self.__queryCommentsHelper(commentQ, errorQ, queryDict, offset,attempt+1)
             
 
         for i in range(totalFound):
@@ -179,7 +190,12 @@ class TimesComments:
             
         # make sure we got at least as many comments as we wanted (maybe a couple more people posted)
         print 'got %d comments (expected %d)' % (len(self.myComments), totalFound)
-        assert  len(self.myComments) >= totalFound 
+        if  len(self.myComments) < totalFound:
+            ans = None
+            while ans != 'y' and ans != 'n':
+                ans = raw_input('Missed some comments, continue anyways (y/n)? ')
+            if ans == 'n':
+                sys.exit()
 
 
     def initByDate(self, date):

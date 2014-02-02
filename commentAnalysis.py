@@ -121,7 +121,7 @@ class MultiAnalysis:
             if lookbackDays == None:
                 lookbackDays = int(raw_input('How many days to look back for comparison? '))
             if saveToFile == None:
-                ans = ''
+                ans = None
                 while ans != 'y' and ans != 'n':
                     ans = raw_input('Save output to file (y/n)? ')
                 if ans == 'y':
@@ -162,13 +162,13 @@ class MultiAnalysis:
 
         # check whether to go ahead and do the analysis right now
         if interactive:
-            ans = ''
+            ans = None
             while ans != 'y' and ans != 'n':
                 ans = raw_input('Plot word frequencies (y/n)? ')
             if ans == 'y':
                 self.powerLawPlot()
                 
-            ans = ''
+            ans = None
             while ans != 'y' and ans != 'n':
                 ans = raw_input('Calculate gains and losses (y/n)? ')
             if ans == 'y':
