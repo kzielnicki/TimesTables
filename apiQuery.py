@@ -31,7 +31,7 @@ class TimesComments:
     commentsAPI = 'http://api.nytimes.com/svc/community/v2/comments/'
     articleAPI = 'http://api.nytimes.com/svc/search/v2/'
         
-    def __init__(self, date=None, restore=True):
+    def __init__(self, date=None, forceQuery=False):
         """
         initialize a new TimesComments object, grabbing all comments from date if specified (format YYYYMMDD)
         optionally, set whether to restore from saved file, and savePoems to text file
@@ -44,23 +44,31 @@ class TimesComments:
         self.commentKey = config.get('API_KEY','commentKey')
         self.articleKey = config.get('API_KEY','articleKey')
         
-        if date != None:
-            if restore:
-                try:
-                    with open('timesComments'+date, 'r') as myFile:
-                        saved = pickle.load(myFile)
-                        self.myComments = saved.myComments
-                        print 'Loaded %d comments!' % len(self.myComments)
-                except Exception as e:
-                    print 'Exception: '+str(e)
-                    print 'Couldn\'t restore from file! Try loading from the API with:'
-                    print 'TimesComments(\''+date+'\',False)'
-                    
-            else:
-                #self.initByKeyword('brainlike','computers learning')
-                self.initByDate(date)
-                with open('timesComments'+date,'w') as myFile:
-                    pickle.dump(self,myFile)
+        if date == None:
+            print 'No date given, using 20140101'
+            date = '20140101'
+
+        if forceQuery:
+            print 'Force to query API!'
+            self.initByDate(date)
+            with open('timesComments'+date,'w') as myFile:
+                pickle.dump(self,myFile)
+        else:
+            try:
+                with open('timesComments'+date, 'r') as myFile:
+                    saved = pickle.load(myFile)
+                    self.myComments = saved.myComments
+                    print 'Loaded %d comments!' % len(self.myComments)
+            except Exception as e:
+                print 'Exception: '+str(e)
+                ans = None
+                while ans != 'y' and ans != 'n':
+                    ans = raw_input('Couldn\'t restore from file! Would you like to query the API for '+date+' (y/n)? ')
+                if ans == 'y':
+                    self.initByDate(date)
+                    with open('timesComments'+date,'w') as myFile:
+                        pickle.dump(self,myFile)
+
         
 
     def queryArticles(self, queryDict):
@@ -353,7 +361,6 @@ class TimesComments:
 
 if __name__ == "__main__":
     print 'Usage:'
-    print '  TimesComments(\'YYYYMMDD\') - restore comments from date'
-    print '  TimesComments(\'YYYYMMDD\',False) - query API for comments from date, then save to file'
+    print '  TimesComments(\'YYYYMMDD\') - get comments from date'
     #myComments = TimesComments('20140104')
 

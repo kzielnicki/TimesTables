@@ -110,7 +110,7 @@ class LearningModel:
         else:
             self.degree = 2 # polynomial degree for feature mapping
             self.useInverse = True # whether to use inverse features for feature mapping
-            self.C = 1 # regularization parameter 
+            self.C = 2 # regularization parameter 
             self.trainingSet = trainingSet
             self.n = len(trainingSet[0].parameters) # number of features
             self.m = len(trainingSet)
@@ -428,7 +428,7 @@ class LearningModel:
         
 
      
-def classifyData(date=None, restore=True):
+def classifyData(date=None):
     """
     Retrain the learning model and save to file, optionally also categorize new comments from 'date' with user input
     Returns trained model
@@ -450,7 +450,7 @@ def classifyData(date=None, restore=True):
             myModel = None
             
         commentList = map(lambda x: x.comment, trainingSet)
-        myComments = TimesComments(date,restore)
+        myComments = TimesComments(date)
         
         i = 0
         for comment in myComments.iterComments():

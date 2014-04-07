@@ -1,0 +1,104 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+        <SchemaVersion>2.0</SchemaVersion>
+        <ProjectGuid>{b4c5d8f5-b349-456d-9d04-341930df1c44}</ProjectGuid>
+        <ProjectHome />
+        <StartupFile />
+        <SearchPath />
+        <WorkingDirectory>.</WorkingDirectory>
+        <OutputPath>.</OutputPath>
+        <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+        <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+    <ItemGroup>
+        <Content Include="utilpost20140127.html" />
+        <Content Include="utilpost20140128.html" />
+        <Content Include="utilpost20140330.html" />
+        <Content Include="utilpost20140319.html" />
+        <Content Include="utilpost20140325.html" />
+        <Content Include="utilpost20140324.html" />
+        <Content Include="utilpost20140308.html" />
+        <Content Include="utilpost20140307.html" />
+        <Content Include="utilpost20140227.html" />
+        <Content Include="utilpost20140201.html" />
+        <Content Include="utilpost20140226.html" />
+        <Content Include="utilpost20140131.html" />
+        <Content Include="utilpost20140323.html" />
+        <Content Include="utilpost20140326.html" />
+        <Content Include="utilpost20140331.html" />
+        <Content Include="utilpost20140129.html" />
+        <Content Include="utilpost20140214.html" />
+        <Content Include="utilpost20140301.html" />
+        <Content Include="utilpost20140313.html" />
+        <Content Include="utilpost20140316.html" />
+        <Content Include="utilpost20140303.html" />
+        <Content Include="utilpost20140204.html" />
+        <Content Include="utilpost20140322.html" />
+        <Content Include="utilpost20140222.html" />
+        <Content Include="utilpost20140217.html" />
+        <Content Include="utilpost20140329.html" />
+        <Content Include="utilpost20140310.html" />
+        <Content Include="utilpost20140401.html" />
+        <Content Include="utilpost20140314.html" />
+        <Content Include="utilpost20140304.html" />
+        <Content Include="utilpost20140309.html" />
+        <Content Include="utilpost20140404.html" />
+        <Content Include="utilpost20140327.html" />
+        <Content Include="utilpost20140207.html" />
+        <Content Include="utilpost20140212.html" />
+        <Content Include="utilpost20140130.html" />
+        <Content Include="utilpost20140220.html" />
+        <Content Include="utilpost20140215.html" />
+        <Content Include="utilpost20140306.html" />
+        <Content Include="utilpost20140224.html" />
+        <Content Include="utilpost20140225.html" />
+        <Content Include="utilpost20140312.html" />
+        <Content Include="utilpost20140213.html" />
+        <Content Include="utilpost20140208.html" />
+        <Content Include="utilpost20140405.html" />
+        <Content Include="utilpost20140209.html" />
+        <Content Include="utilpost20140311.html" />
+        <Content Include="utilpost20140305.html" />
+        <Content Include="utilpost20140328.html" />
+        <Content Include="utilpost20140403.html" />
+        <Content Include="utilpost20140318.html" />
+        <Content Include="utilpost20140216.html" />
+        <Content Include="utilpost20140221.html" />
+        <Content Include="utilpost20140211.html" />
+        <Content Include="utilpost20140206.html" />
+        <Content Include="utilpost20140321.html" />
+        <Content Include="utilpost20140203.html" />
+        <Content Include="utilpost20140219.html" />
+        <Content Include="utilpost20140402.html" />
+        <Content Include="utilpost20140315.html" />
+        <Content Include="utilpost20140320.html" />
+        <Content Include="utilpost20140218.html" />
+        <Content Include="utilpost20140223.html" />
+        <Content Include="utilpost20140317.html" />
+        <Content Include="utilpost20140205.html" />
+        <Content Include="utilpost20140302.html" />
+        <Content Include="utilpost20140210.html" />
+        <Content Include="utilpost20140202.html" />
+        <Content Include="utilpost20140228.html" />
+        <Content Include="utilpost20140124.html" />
+        <Content Include="utilpost20140123.html" />
+        <Content Include="utilpost20140125.html" />
+        <Content Include="utilpost20140126.html" />
+        <Compile Include="apiQuery.py" />
+        <Compile Include="classifyData.py" />
+        <Compile Include="commentAnalysis.py" />
+        <Compile Include="utilBlogUpdate.py" />
+        <Compile Include="utilFixTraining.py" />
+        <Compile Include="utilTestTemp.py" />
+        <Compile Include="__init__.py" />
+        <Compile Include="test\utilexample.py" />
+    </ItemGroup>
+    <ItemGroup>
+        <Folder Include="test" />
+    </ItemGroup>
+    <Import Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
+</Project>

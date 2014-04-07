@@ -10,17 +10,17 @@ import matplotlib.pyplot as plt
 
 class CommentAnalysis:
     """
-    Provides an interface to apiQuery and classifyData to grab and analyze poems from a given date
+    Analyze comments from a given data, using apiQuery to grab comments and classifyData to find poems
     """
     
-    def __init__(self,date,saveToFile=False,restore=True,verbose=True):
+    def __init__(self,date,saveToFile=False,verbose=True):
         """
         Initialize comment analysis object by loading comments from 'date' and perform analysis
         Optionally choose whether to save analysis, and whether to restore saved comments from file
         NOTE: poetry finding assumes learning model has already been trained & saved
         """
         self.date = date
-        self.myComments = TimesComments(date,restore)
+        self.myComments = TimesComments(date)
         
         self.verbose = verbose
         if verbose:
@@ -109,6 +109,7 @@ class CommentAnalysis:
 class MultiAnalysis:
     """
     Perform analysis on comments from multiple days
+    Initialize with a date and the number of days to look back before that date
     """
     
     def __init__(self,date=None,lookbackDays=None,saveToFile=None,verbose=True,interactive=False):
@@ -201,7 +202,6 @@ class MultiAnalysis:
         By default, compares with all days in analysis set, optionally only to yesterday
         z=2 for ~95% confidence interval
         """
-        yesterday = None
         result = {}
         date = self.dates[0]
         words = self.words[0]
@@ -300,7 +300,7 @@ class MultiAnalysis:
 if __name__ == "__main__":
     print 'Usage:'
     print '  CommentAnalysis(\'YYYYMMDD\') - analyze saved comments from date'
-    print '  CommentAnalysis(\'YYYYMMDD\',True) - analyze saved comments from date, saving poems to file'
-    print '  CommentAnalysis(\'YYYYMMDD\',False,False) - query API for comments from date, then analyze'
+    #print '  CommentAnalysis(\'YYYYMMDD\',True) - analyze saved comments from date, saving poems to file'
+    #print '  CommentAnalysis(\'YYYYMMDD\',False,False) - query API for comments from date, then analyze'
     print '  MultiAnalysis(interactive=True) - analyze word frequency trends from multiple days'
     #myAnalysis = AnalyzeComments('20140104')
